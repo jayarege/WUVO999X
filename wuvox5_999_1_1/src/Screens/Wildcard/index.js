@@ -338,11 +338,15 @@ function WildcardScreen({
   const buildFilteredMoviePool = useCallback(async () => {
     if (isLoadingFilteredPool) return;
 
-    console.log('Building simple filtered movie pool...');
+    console.log('🔍 Building filtered movie pool with filters:', {
+      genres: selectedGenres,
+      decades: selectedDecades,
+      streaming: selectedStreamingServices
+    });
     setIsLoadingFilteredPool(true);
 
     try {
-      let apiUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&vote_count.gte=${MIN_VOTE_COUNT}`;
+      let apiUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&vote_count.gte=${MIN_VOTE_COUNT}&include_adult=false`;
 
       // Apply decade filters
       if (selectedDecades.length > 0) {
@@ -355,14 +359,14 @@ function WildcardScreen({
           const startYear = Math.min(...dateRanges.map(r => r.start));
           const endYear = Math.max(...dateRanges.map(r => r.end));
           apiUrl += `&primary_release_date.gte=${startYear}-01-01&primary_release_date.lte=${endYear}-12-31`;
-          console.log(`Date filter: ${startYear}-${endYear}`);
+          console.log(`📅 Date filter applied: ${startYear}-${endYear}`);
         }
       }
 
       // Apply genre filters
       if (selectedGenres.length > 0) {
         apiUrl += `&with_genres=${selectedGenres.join(',')}`;
-        console.log(`Genre filter: ${selectedGenres.join(',')}`);
+        console.log(`🎭 Genre filter applied: ${selectedGenres.join(',')}`);
       }
 
       // Create exclusion set
@@ -372,62 +376,83 @@ function WildcardScreen({
       comparedMovies.forEach(id => excludedIds.add(id));
       skippedMovies.forEach(id => excludedIds.add(id));
 
-      // Get popular movies matching decade/genre filters
-      const response = await fetchWithTimeout(`${apiUrl}&page=1`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      console.log(`🚫 Excluding ${excludedIds.size} already seen/compared movies`);
+
+      // Get multiple pages to have better selection
+      const allMovies = [];
+      const maxPages = 3; // Get 3 pages for better variety
+
+      for (let page = 1; page <= maxPages; page++) {
+        try {
+          const response = await fetchWithTimeout(`${apiUrl}&page=${page}`);
+          if (!response.ok) continue;
+
+          const data = await response.json();
+          const pageMovies = data.results.filter(m =>
+            m.poster_path &&
+            m.vote_average >= MIN_SCORE &&
+            !excludedIds.has(m.id)
+          );
+          
+          allMovies.push(...pageMovies);
+          console.log(`📄 Page ${page}: Found ${pageMovies.length} eligible movies`);
+          
+          // If we have enough movies, break early
+          if (allMovies.length >= 30) break;
+        } catch (error) {
+          console.log(`Error fetching page ${page}:`, error);
+          continue;
+        }
       }
 
-      const data = await response.json();
-      const eligibleMovies = data.results.filter(m =>
-        m.poster_path &&
-        m.vote_average >= MIN_SCORE &&
-        !excludedIds.has(m.id)
-      );
-
-      console.log(`Found ${eligibleMovies.length} popular movies matching filters`);
+      console.log(`🎬 Total movies found matching genre/decade filters: ${allMovies.length}`);
 
       // If no streaming filter, we're done
       if (selectedStreamingServices.length === 0) {
-        setFilteredMoviePool(eligibleMovies);
+        setFilteredMoviePool(allMovies.slice(0, 20)); // Limit to 20 for performance
         setIsLoadingFilteredPool(false);
         return;
       }
 
-      // For streaming filters, just take the first few popular movies and check them
-      console.log(`Checking streaming for top movies...`);
+      // For streaming filters, check each movie
+      console.log(`🎥 Checking streaming availability for ${selectedStreamingServices.length} services...`);
       const streamingFilteredMovies = [];
       
-      for (let i = 0; i < Math.min(eligibleMovies.length, 10); i++) {
-        const movie = eligibleMovies[i];
+      for (let i = 0; i < Math.min(allMovies.length, 20); i++) {
+        const movie = allMovies[i];
         try {
           const streamingServices = await getMovieStreamingData(movie.id);
           
-          const hasSelectedService = streamingServices.some(service => 
-            selectedStreamingServices.includes(service.provider_id.toString())
-          );
+          // Check if movie is available on any of the selected services
+          const hasSelectedService = streamingServices.some(service => {
+            const consolidatedService = PROVIDER_CONSOLIDATION[service.provider_id];
+            const serviceId = consolidatedService ? consolidatedService.displayId : service.provider_id;
+            return selectedStreamingServices.includes(serviceId.toString());
+          });
 
           if (hasSelectedService) {
             streamingFilteredMovies.push({
               ...movie,
               streamingServices: streamingServices
             });
-            console.log(`✅ ${movie.title} available on selected service`);
+            console.log(`✅ ${movie.title} available on selected streaming service`);
+          } else {
+            console.log(`❌ ${movie.title} not available on selected services`);
           }
           
-          // Stop after finding 5 matches
-          if (streamingFilteredMovies.length >= 5) break;
+          // Stop after finding enough matches
+          if (streamingFilteredMovies.length >= 15) break;
         } catch (error) {
-          console.log(`Error checking ${movie.title}:`, error);
+          console.log(`❌ Error checking streaming for ${movie.title}:`, error);
           continue;
         }
       }
 
       setFilteredMoviePool(streamingFilteredMovies);
-      console.log(`Pool ready: ${streamingFilteredMovies.length} movies`);
+      console.log(`🎯 Final filtered pool ready: ${streamingFilteredMovies.length} movies`);
       
     } catch (error) {
-      console.error('Error building filtered movie pool:', error);
+      console.error('❌ Error building filtered movie pool:', error);
       setFilteredMoviePool([]);
     } finally {
       setIsLoadingFilteredPool(false);
@@ -1576,9 +1601,9 @@ function WildcardScreen({
             activeOpacity={0.7}
           >
             <Ionicons name="filter" size={24} color={colors.accent} />
-            {hasActiveFilters && (
-              <View style={[styles.filterBadge, { backgroundColor: colors.secondary }]} />
-            )}
+           {(selectedGenres.length > 0 || selectedDecades.length > 0 || selectedStreamingServices.length > 0) && (
+          <View style={[styles.filterBadge, { backgroundColor: colors.secondary }]} />
+        )}
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
@@ -1797,51 +1822,63 @@ function WildcardScreen({
         onRequestClose={cancelFilters}
       >
 <View style={[modalStyles.modalOverlay, { justifyContent: 'center', alignItems: 'center' }]}>
-          <LinearGradient
-            colors={colors.primaryGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+          <View
             style={{
-              width: '85%',
-              maxHeight: '70%',
+              width: '90%',
+              height: '80%',
               borderRadius: colors.border.radius,
-              padding: 20
+              overflow: 'hidden'
             }}
           >
-            
-            {/* Modal Header */}
-            <View style={[
-              modalStyles.buttonRow,
-              { 
+            <LinearGradient
+              colors={colors.primaryGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{
+                flex: 1,
+                padding: 20
+              }}
+            >
+              
+              {/* Modal Header */}
+              <View style={{
+                flexDirection: 'row',
                 justifyContent: 'space-between',
+                alignItems: 'center',
                 marginBottom: 20,
                 paddingBottom: 10,
                 borderBottomWidth: 1,
                 borderBottomColor: 'rgba(255,255,255,0.3)'
-              }
-            ]}>
-              <Text style={[
-                modalStyles.detailTitle,
-                { fontSize: 20, marginBottom: 0, color: colors.text }
-              ]}>
-                Filter Movies
-              </Text>
-              <TouchableOpacity
-                style={[modalStyles.actionButton, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
-                onPress={clearAllFilters}
-                activeOpacity={0.7}
-              >
-                <Text style={[modalStyles.actionButtonText, { color: colors.text }]}>
-                  Clear All
+              }}>
+                <Text style={{
+                  fontSize: 20,
+                  fontWeight: 'bold',
+                  color: colors.text
+                }}>
+                  Filter Movies
                 </Text>
-              </TouchableOpacity>
-            </View>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    paddingVertical: 6,
+                    paddingHorizontal: 12,
+                    borderRadius: 8
+                  }}
+                  onPress={clearAllFilters}
+                  activeOpacity={0.7}
+                >
+                  <Text style={{ color: colors.text, fontSize: 14, fontWeight: '600' }}>
+                    Clear All
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
-            {/* Scrollable Content */}
-            <ScrollView 
-              style={{ flex: 1 }}
-              showsVerticalScrollIndicator={false}
-            >
+              {/* Scrollable Content */}
+              <ScrollView 
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingBottom: 20 }}
+                showsVerticalScrollIndicator={false}
+              >
               
               {/* Genre Filter Section */}
               <View style={{ marginBottom: 25 }}>
@@ -1861,43 +1898,52 @@ function WildcardScreen({
                   flexWrap: 'wrap',
                   gap: 8
                 }}>
-                  {genres && Object.keys(genres).length > 0 ? (
-                    Object.entries(genres)
-                      .filter(([id, name]) => name && name.trim() !== '')
-                      .map(([id, name]) => (
-                        <TouchableOpacity
-                          key={id}
-                          style={{
-                            backgroundColor: tempGenres.includes(id)
-                              ? 'rgba(255,255,255,0.3)' 
-                              : 'rgba(255,255,255,0.1)',
-                            borderColor: 'rgba(255,255,255,0.4)',
-                            borderWidth: 1,
-                            borderRadius: colors.border.radius,
-                            paddingVertical: 8,
-                            paddingHorizontal: 12,
-                            marginBottom: 8
-                          }}
-                          onPress={() => toggleGenre(id)}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={{
-                            color: colors.text,
-                            fontSize: 13,
-                            fontWeight: '500'
-                          }}>
-                            {name}
-                          </Text>
-                        </TouchableOpacity>
-                      ))
-                  ) : (
-                    <Text style={[
-                      modalStyles.actionButtonText,
-                      { color: colors.secondary, padding: 10 }
-                    ]}>
-                      No genres available
-                    </Text>
-                  )}
+                  {Object.entries({
+                    28: 'Action',
+                    12: 'Adventure', 
+                    16: 'Animation',
+                    35: 'Comedy',
+                    80: 'Crime',
+                    99: 'Documentary',
+                    18: 'Drama',
+                    10751: 'Family',
+                    14: 'Fantasy',
+                    36: 'History',
+                    27: 'Horror',
+                    10402: 'Music',
+                    9648: 'Mystery',
+                    10749: 'Romance',
+                    878: 'Science Fiction',
+                    10770: 'TV Movie',
+                    53: 'Thriller',
+                    10752: 'War',
+                    37: 'Western'
+                  }).map(([id, name]) => (
+                    <TouchableOpacity
+                      key={id}
+                      style={{
+                        backgroundColor: tempGenres.includes(id)
+                          ? 'rgba(255,255,255,0.3)' 
+                          : 'rgba(255,255,255,0.1)',
+                        borderColor: 'rgba(255,255,255,0.4)',
+                        borderWidth: 1,
+                        borderRadius: colors.border.radius,
+                        paddingVertical: 8,
+                        paddingHorizontal: 12,
+                        marginBottom: 8
+                      }}
+                      onPress={() => toggleGenre(id)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={{
+                        color: colors.text,
+                        fontSize: 13,
+                        fontWeight: '500'
+                      }}>
+                        {name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
               </View>
 
@@ -1947,6 +1993,7 @@ function WildcardScreen({
                   ))}
                 </View>
               </View>
+
               {/* Streaming Services Filter Section */}
               <View style={{ marginBottom: 25 }}>
                 <Text style={[
@@ -1965,7 +2012,15 @@ function WildcardScreen({
                   flexWrap: 'wrap',
                   gap: 8
                 }}>
-                  {streamingProviders.map((service) => (
+                  {[
+                    { id: 8, name: 'Netflix' },
+                    { id: 9, name: 'Prime Video' },
+                    { id: 15, name: 'Hulu' },
+                    { id: 337, name: 'Disney+' },
+                    { id: 350, name: 'Apple TV+' },
+                    { id: 384, name: 'HBO Max' },
+                    { id: 387, name: 'Peacock' }
+                  ].map((service) => (
                     <TouchableOpacity
                       key={service.id}
                       style={{
@@ -1984,18 +2039,6 @@ function WildcardScreen({
                       onPress={() => toggleStreamingService(service.id)}
                       activeOpacity={0.7}
                     >
-                      {service.logo_url && (
-                        <Image
-                          source={{ uri: service.logo_url }}
-                          style={{
-                            width: 16,
-                            height: 16,
-                            marginRight: 6,
-                            borderRadius: 2
-                          }}
-                          resizeMode="contain"
-                        />
-                      )}
                       <Text style={{
                         color: colors.text,
                         fontSize: 13,
@@ -2007,18 +2050,17 @@ function WildcardScreen({
                   ))}
                 </View>
               </View>
-            </ScrollView>
+              
+              </ScrollView>
             
             {/* Modal Action Buttons */}
-            <View style={[
-              modalStyles.buttonRow,
-              { 
+            <View style={{
+                flexDirection: 'row',
                 marginTop: 20,
                 paddingTop: 15,
                 borderTopWidth: 1,
                 borderTopColor: 'rgba(255,255,255,0.3)'
-              }
-            ]}>
+              }}>
               <TouchableOpacity
                 style={{
                   backgroundColor: 'rgba(255,255,255,0.1)',
@@ -2064,13 +2106,14 @@ function WildcardScreen({
             </View>
             
             {/* Close button */}
-            <TouchableOpacity 
-              onPress={cancelFilters} 
-              style={{ alignItems: 'center', paddingTop: 15 }}
-            >
-              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>dismiss</Text>
-            </TouchableOpacity>
-          </LinearGradient>
+              <TouchableOpacity 
+                onPress={cancelFilters} 
+                style={{ alignItems: 'center', paddingTop: 15 }}
+              >
+                <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>dismiss</Text>
+              </TouchableOpacity>
+            </LinearGradient>
+          </View>
         </View>
       </Modal>
 
