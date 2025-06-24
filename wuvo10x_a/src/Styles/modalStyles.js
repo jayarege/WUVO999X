@@ -20,12 +20,12 @@ const getModalStyles = (mediaType = 'movie', mode = 'light', theme) => {
       marginHorizontal: '5%',
       borderRadius: 20,
       overflow: 'hidden',
-      top: '25%',
-      bottom: '1%',
+      top: '20%', // Moved up slightly
+      bottom: '5%', // More bottom margin for keyboard
       left: 0,
       right: 0,
       backgroundColor: colors.primary,
-      maxHeight: '100%',
+      maxHeight: '70%', // Constrain height to avoid keyboard overlap
     },
     modalHandle: {
       width: 40,

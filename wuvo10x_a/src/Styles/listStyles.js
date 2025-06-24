@@ -30,40 +30,46 @@ const getListStyles = (mediaType = 'movie', mode = 'light', theme) => {
     },
     movieDetails: {
       flex: 1,
-      padding: 16,
-      justifyContent: 'center',
+      padding: 12, // Reduced for more content space
+      height: 150, // Match poster height exactly
+      justifyContent: 'space-between', // Distribute content evenly
       backgroundColor: colors.card,
+      overflow: 'hidden', // Prevent content overflow
     },
     resultTitle: {
-      fontSize: 18,
+      fontSize: 16, // Reduced from 18 for better fit
       fontWeight: 'bold',
-      marginBottom: 8,
+      marginBottom: 4, // Reduced from 8
       color: colors.text,
       fontFamily: colors.font.header, // Cooper Black for movies, American Typewriter Bold for TV
+      height: 38, // Fixed height for up to 2 lines
+      textAlignVertical: 'top',
     },
     resultYear: {
-      fontSize: 14,
-      marginBottom: 4,
+      fontSize: 13, // Slightly reduced
+      marginBottom: 3, // Reduced margin
       color: colors.subText,
       fontFamily: colors.font.body, // Bookman Old Style for movies, Helvetica Neue for TV
     },
     resultOverview: {
-      fontSize: 14,
-      lineHeight: 18,
+      fontSize: 13, // Slightly reduced
+      lineHeight: 16, // Tighter line height
       color: colors.text,
       fontFamily: colors.font.body,
+      numberOfLines: 2, // Limit to 2 lines
+      ellipsizeMode: 'tail',
     },
     resultRating: {
-      fontSize: 14,
-      marginTop: 8,
+      fontSize: 13, // Slightly reduced
+      marginTop: 4, // Reduced margin
       color: colors.accent,
       fontFamily: colors.font.body,
       fontWeight: '600',
     },
     rankBadge: {
-      width: 30,
-      height: 30,
-      borderRadius: 15,
+      width: 36, // Slightly larger to fit bigger number
+      height: 36,
+      borderRadius: 18,
       backgroundColor: colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
@@ -74,9 +80,41 @@ const getListStyles = (mediaType = 'movie', mode = 'light', theme) => {
     },
     rankNumber: {
       fontWeight: 'bold',
-      fontSize: 16,
+      fontSize: 32, // 2x larger (16 * 2 = 32)
       color: colors.text,
       fontFamily: colors.font.body,
+    },
+    
+    // Additional optimized styles for content fitting
+    scoreContainer: {
+      marginTop: 2, // Minimal margin
+      flexGrow: 1, // Take available space
+      justifyContent: 'center',
+    },
+    finalScore: {
+      fontSize: 18, // Reduced from 24
+      fontWeight: 'bold',
+      marginBottom: 4, // Reduced margin
+      color: colors.accent,
+    },
+    genresText: {
+      fontSize: 11, // Smaller for better fit
+      color: colors.subText,
+      numberOfLines: 1, // Single line only
+      ellipsizeMode: 'tail',
+      marginBottom: 4,
+    },
+    editButton: {
+      paddingVertical: 6, // Smaller button
+      paddingHorizontal: 12,
+      borderRadius: 6,
+      alignSelf: 'flex-start',
+      backgroundColor: colors.primary,
+    },
+    editButtonText: {
+      fontSize: 13, // Slightly smaller
+      fontWeight: '600',
+      color: colors.accent,
     },
   });
 };
@@ -106,13 +144,17 @@ const listStyles = StyleSheet.create({
   },
   movieDetails: {
     flex: 1,
-    padding: 16,
-    justifyContent: 'center',
+    padding: 12, // Reduced for more content space
+    height: 150, // Match poster height exactly
+    justifyContent: 'space-between', // Distribute content evenly
+    overflow: 'hidden', // Prevent content overflow
   },
   resultTitle: {
-    fontSize: 18,
+    fontSize: 16, // Reduced from 18
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 4, // Reduced from 8
+    height: 38, // Fixed height for up to 2 lines
+    textAlignVertical: 'top',
   },
   rankBadge: {
     width: 30,
@@ -127,7 +169,35 @@ const listStyles = StyleSheet.create({
   },
   rankNumber: {
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 32, // 2x larger (16 * 2 = 32)
+  },
+  
+  // Additional static styles for content fitting
+  scoreContainer: {
+    marginTop: 2,
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  finalScore: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  genresText: {
+    fontSize: 11,
+    numberOfLines: 1,
+    ellipsizeMode: 'tail',
+    marginBottom: 4,
+  },
+  editButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  editButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });
 

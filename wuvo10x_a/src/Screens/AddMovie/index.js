@@ -31,7 +31,7 @@ import stateStyles from '../../Styles/StateStyles';
 import theme from '../../utils/Theme';
 
 import { TMDB_API_KEY as API_KEY } from '../../Constants';
-import { filterAdultContent, isContentSafe } from '../../utils/ContentFilter';
+import { filterAdultContent, filterSearchResults, isContentSafe } from '../../utils/ContentFilter';
 const { width } = Dimensions.get('window');
 
 function AddMovieScreen({ seen, unseen, onAddToSeen, onAddToUnseen, onRemoveFromWatchlist, onUpdateRating, genres, isDarkMode }) {
@@ -101,8 +101,9 @@ function AddMovieScreen({ seen, unseen, onAddToSeen, onAddToUnseen, onRemoveFrom
       const data = await response.json();
       
       if (data.results && data.results.length > 0) {
-        // Process results
-        const filteredResults = data.results
+        // Apply content filtering and process results
+        const safeResults = filterSearchResults(data.results, mediaType);
+        const filteredResults = safeResults
           .filter(item => item.poster_path != null)
           .sort((a, b) => {
             if (b.vote_count !== a.vote_count) {
@@ -191,9 +192,11 @@ function AddMovieScreen({ seen, unseen, onAddToSeen, onAddToUnseen, onRemoveFrom
       const data = await response.json();
       
       if (data.results && data.results.length > 0) {
+        // Apply enhanced search filtering (more conservative for search)
+        const filteredResults = filterSearchResults(data.results, mediaType);
         const seenIds = new Set();
         
-        const processedResults = data.results
+        const processedResults = filteredResults
           .filter(item => {
             if (!item.poster_path) return false;
             if (seenIds.has(item.id)) return false;

@@ -44,6 +44,7 @@ import {
   STREAMING_CACHE_KEY, 
   API_TIMEOUT 
 } from '../../Constants';
+import { filterAdultContent, filterSearchResults } from '../../utils/ContentFilter';
 
 const API_KEY = TMDB_API_KEY;
 import stateStyles from '../../Styles/StateStyles';
@@ -470,7 +471,8 @@ function WildcardScreen({
           if (!response.ok) continue;
 
           const data = await response.json();
-          const pageContent = data.results.filter(m =>
+          const safeContent = applyContentFiltering(data.results);
+          const pageContent = safeContent.filter(m =>
             m.poster_path &&
             m.vote_average >= MIN_SCORE &&
             !excludedIds.has(m.id)

@@ -30,6 +30,7 @@ import stateStyles from '../../Styles/StateStyles';
 import theme from '../../utils/Theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RatingModal } from '../../Components/RatingModal';
+import { filterAdultContent } from '../../utils/ContentFilter';
  
 
 // Import constants
@@ -154,7 +155,9 @@ const moviesByMediaType = useMemo(() => {
   const sortedMovies = [...moviesByMediaType].sort((a, b) => b.score - a.score);
 
   const filteredMovies = useMemo(() => {
-    let filtered = sortedMovies;
+    // Apply content filtering for safety first
+    const safeContent = filterAdultContent(sortedMovies, mediaType);
+    let filtered = safeContent;
 
     // Apply advanced filters
     if (selectedGenres.length > 0) {
@@ -183,7 +186,7 @@ const moviesByMediaType = useMemo(() => {
     }
 
     return filtered;
-  }, [selectedGenres, selectedDecades, selectedStreamingServices, selectedGenreId, sortedMovies]);
+  }, [selectedGenres, selectedDecades, selectedStreamingServices, selectedGenreId, sortedMovies, mediaType]);
 
   const uniqueGenreIds = useMemo(() => {
     return Array.from(new Set(moviesByMediaType.flatMap(m => m.genre_ids || [])));

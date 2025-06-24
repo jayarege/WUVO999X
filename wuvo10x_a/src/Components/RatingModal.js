@@ -62,7 +62,7 @@ const RatingModal = ({
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 20}
       >
         <View style={modalStyles.modalOverlay}>
           <Animated.View
@@ -77,7 +77,12 @@ const RatingModal = ({
               colors={colors.primaryGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={{ flex: 1, borderRadius: 20, justifyContent: 'space-between' }}
+              style={{ 
+                flex: 1, 
+                borderRadius: 20, 
+                justifyContent: 'space-between',
+                paddingBottom: Platform.OS === 'ios' ? 20 : 10 // Extra bottom padding
+              }}
             >
               <View style={ratingStyles.modalContentContainer}>
                 <View style={modalStyles.modalHandle} />

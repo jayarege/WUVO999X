@@ -29,6 +29,7 @@ import stateStyles from '../../Styles/StateStyles';
 import { LinearGradient } from 'expo-linear-gradient';
 import theme from '../../utils/Theme';
 import { TMDB_API_KEY } from '../../Constants';
+import { filterAdultContent } from '../../utils/ContentFilter';
 
 const API_KEY = TMDB_API_KEY;
 
@@ -162,7 +163,9 @@ function TopRatedScreen({ movies, onUpdateRating, genres, isDarkMode }) {
   
   // Filter and sort movies by selected genre and rating
   const filteredAndRankedMovies = useMemo(() => {
-    let filtered = [...mediaFilteredMovies];
+    // First apply content filtering for safety
+    const safeContent = filterAdultContent(mediaFilteredMovies, mediaType);
+    let filtered = [...safeContent];
     
     // Apply genre filter if selected
     if (selectedGenreId !== null) {
@@ -183,7 +186,7 @@ function TopRatedScreen({ movies, onUpdateRating, genres, isDarkMode }) {
     
     // Take top 10 after filtering and sorting
     return filtered.slice(0, 10);
-  }, [mediaFilteredMovies, selectedGenreId]);
+  }, [mediaFilteredMovies, selectedGenreId, mediaType]);
 
   const openEditModal = useCallback((movie) => {
     setSelectedMovie(movie);
@@ -543,17 +546,19 @@ return (
   );
 }
 
-// Styles
+// Updated styles for TopRated screen to work with constrained layout
+// Add these to your TopRated/index.js styles section
+
 const styles = StyleSheet.create({
   editButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    paddingVertical: 6, // Reduced from 8
+    paddingHorizontal: 12, // Reduced from 16
+    borderRadius: 6, // Reduced from 8
     alignSelf: 'flex-start',
-    marginTop: 8,
+    marginTop: 2, // Reduced margin
   },
   editButtonText: {
-    fontSize: 14,
+    fontSize: 13, // Reduced from 14
     fontWeight: '600',
   },
   filterSection: {
@@ -608,90 +613,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontStyle: 'italic',
   },
+  
+  // Enhanced content styles for height constraint
+  scoreContainer: {
+    marginTop: 2, // Minimal margin
+    flexGrow: 1, // Take available space between title and button
+    justifyContent: 'center',
+  },
+  finalScore: {
+    fontSize: 18, // Reduced from 24
+    fontWeight: 'bold',
+    marginBottom: 4, // Reduced margin
+  },
+  
+  // Clear filters button styling
   clearFiltersButton: {
-    marginTop: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
     borderRadius: 8,
+    marginTop: 16,
+    alignSelf: 'center',
   },
   clearFiltersButtonText: {
     fontSize: 16,
-  },
-  scoreContainer: {
-    marginTop: 8,
-  },
-  finalScore: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  ratingModalContent: {
-    position: 'absolute',
-    maxHeight: 'auto',
-    width: '90%',
-    marginHorizontal: '5%',
-    borderRadius: 20,
-    overflow: 'hidden',
-    top: '10%', 
-    left: 0,
-    right: 0,
-  },
-  modalContentContainer: {
-    padding: 20,
-  },
-  modalMovieInfo: {
-    flexDirection: 'row',
-    marginBottom: 8,
-    alignItems: 'center',
-  },
-  modalPoster: {
-    width: 110,
-    height: 165,
-    borderRadius: 8,
-    marginRight: 12,
-  },
-  modalMovieDetails: {
-    flex: 1,
-  },
-  modalMovieTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  modalGenres: {
-    fontSize: 16,
-  },
-  genreTextContainer: {
-    marginVertical: 8,
-  },
-  ratingDisplay: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  ratingLabel: {
-    fontSize: 18,
     fontWeight: '600',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  ratingInput: {
-    height: 56,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    fontSize: 24,
-    fontWeight: 'normal',
-    textAlign: 'center',
-    width: '100%',
-    alignSelf: 'center',
-  },
-  fixedButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 20,
-    paddingTop: 0,
-    borderTopWidth: 1,
   },
 });
 

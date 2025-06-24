@@ -35,7 +35,7 @@ import { getAIRecommendations } from '../../utils/AIRecommendations';
 import { RatingModal } from '../../Components/RatingModal';
 import { ActivityIndicator } from 'react-native';
 import { TMDB_API_KEY as API_KEY } from '../../Constants';
-import { filterAdultContent, isContentSafe } from '../../utils/ContentFilter';
+import { filterAdultContent, filterSearchResults, isContentSafe } from '../../utils/ContentFilter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
