@@ -127,7 +127,7 @@ function HomeScreen({
   const [notInterestedMovies, setNotInterestedMovies] = useState([]);
   
   // **ENHANCED RATING SYSTEM STATE**
-  const [sentimentModalVisible, setSentimentModalVisible] = useState(false);
+  // const [sentimentModalVisible, setSentimentModalVisible] = useState(false); // REMOVED: Now using in-place sentiment buttons
   const [comparisonModalVisible, setComparisonModalVisible] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [comparisonMovies, setComparisonMovies] = useState([]);
@@ -618,7 +618,16 @@ function HomeScreen({
   const handleSentimentSelect = useCallback((categoryKey) => {
     console.log('🎭 User selected sentiment:', categoryKey);
     setSelectedCategory(categoryKey);
-    setSentimentModalVisible(false);
+    
+    // Hide sentiment buttons and show processing state
+    setShowSentimentButtons(false);
+    
+    // Reset action button fade to show they're back
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
     
     // Calculate dynamic categories based on user's rating history
     const RATING_CATEGORIES = calculateDynamicRatingCategories(seen);
@@ -803,7 +812,6 @@ function HomeScreen({
   }, [selectedMovie, selectedCategory, onAddToSeen, contentType, seen, fetchRecentReleases, fetchPopularMovies, fetchAIRecommendations]);
 
   const handleCloseEnhancedModals = useCallback(() => {
-    setSentimentModalVisible(false);
     setComparisonModalVisible(false);
     setSelectedCategory(null);
     setComparisonMovies([]);
@@ -853,9 +861,41 @@ function HomeScreen({
   }, [fetchMovieCredits, fetchMovieProviders, mediaType]);
 
   const openRatingModal = useCallback(() => {
-    setMovieDetailModalVisible(false);
-    setSentimentModalVisible(true);
-  }, []);
+    // Start fade transition to show sentiment buttons in place
+    setShowSentimentButtons(true);
+    
+    // Fade out action buttons and fade in sentiment buttons
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(sentimentFadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      })
+    ]).start();
+  }, [fadeAnim, sentimentFadeAnim]);
+  
+  const cancelSentimentSelection = useCallback(() => {
+    // Reset sentiment buttons and fade back to action buttons
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(sentimentFadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      })
+    ]).start(() => {
+      setShowSentimentButtons(false);
+    });
+  }, [fadeAnim, sentimentFadeAnim]);
 
   const closeRatingModal = useCallback(() => {
     Animated.timing(slideAnim, {
@@ -1938,6 +1978,26 @@ function HomeScreen({
                         </Text>
                       </TouchableOpacity>
                     ))}
+                    
+                    {/* Back button for sentiment selection */}
+                    <TouchableOpacity
+                      style={[
+                        styles.sentimentBackButton,
+                        { 
+                          borderColor: colors.border?.color || '#ccc',
+                          borderWidth: 1,
+                          width: '100%',
+                          marginTop: 8,
+                          paddingVertical: 8,
+                          alignItems: 'center',
+                          borderRadius: 8
+                        }
+                      ]}
+                      onPress={cancelSentimentSelection}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[{ color: colors.subText, fontSize: 14 }]}>← Back to Options</Text>
+                    </TouchableOpacity>
                   </Animated.View>
                 )}
               </View>
@@ -1949,63 +2009,8 @@ function HomeScreen({
           </View>
         </Modal>
 
-        {/* **ENHANCED SENTIMENT SELECTION MODAL** */}
-        <Modal visible={sentimentModalVisible} transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View style={[styles.sentimentModalContent, { backgroundColor: colors.card }]}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
-                How did you feel about
-              </Text>
-              <Text style={[styles.movieTitle, { color: colors.accent }]}>
-                {selectedMovie?.title || selectedMovie?.name}?
-              </Text>
-              
-              <View style={styles.sentimentGrid}>
-                {Object.entries(calculateDynamicRatingCategories(seen)).map(([categoryKey, category]) => (
-                  <TouchableOpacity
-                    key={categoryKey}
-                    style={[
-                      styles.sentimentButton,
-                      { 
-                        backgroundColor: 'transparent',
-                        borderColor: category.borderColor || category.color,
-                        borderWidth: 3
-                      }
-                    ]}
-                    onPress={() => handleSentimentSelect(categoryKey)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.sentimentEmoji}>{category.emoji}</Text>
-                    <Text style={[styles.sentimentLabel, { color: category.color }]}>
-                      {category.label}
-                    </Text>
-                    <Text style={[styles.sentimentDescription, { color: colors.subText }]}>
-                      {category.description}
-                    </Text>
-                    <Text style={[styles.sentimentRange, { color: colors.subText }]}>
-                      {seen && seen.length > 0 ? 
-                        (() => {
-                          const range = getRatingRangeFromPercentile(seen, category.percentile);
-                          return `${range[0].toFixed(1)} - ${range[1].toFixed(1)}`;
-                        })() :
-                        `${category.percentile[0]}th - ${category.percentile[1]}th percentile`
-                      }
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              
-              <TouchableOpacity 
-                style={[styles.cancelButton, { borderColor: colors.border?.color || '#ccc' }]}
-                onPress={handleCloseEnhancedModals}
-              >
-                <Text style={[styles.cancelButtonText, { color: colors.subText }]}>
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
+        {/* **ENHANCED SENTIMENT SELECTION MODAL - REMOVED: Now handled in-place within movie detail modal** */}
+        {/* Sentiment buttons now appear directly in the action button area */}
 
         {/* **WILDCARD COMPARISON MODAL** */}
         <Modal visible={comparisonModalVisible} transparent animationType="slide">
@@ -2277,35 +2282,35 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
   },
-  sentimentGrid: {
-    gap: 16,
-    marginBottom: 24,
-  },
+  // sentimentGrid: { // REMOVED: No longer using separate sentiment modal
+  //   gap: 16,
+  //   marginBottom: 24,
+  // },
   sentimentButton: {
     padding: 20,
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 8,
   },
-  sentimentEmoji: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
+  // sentimentEmoji: { // REMOVED: No longer using separate sentiment modal
+  //   fontSize: 32,
+  //   marginBottom: 8,
+  // },
   sentimentLabel: {
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 4,
   },
-  sentimentDescription: {
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  sentimentRange: {
-    fontSize: 10,
-    textAlign: 'center',
-    marginTop: 2,
-    fontStyle: 'italic',
-  },
+  // sentimentDescription: { // REMOVED: No longer using separate sentiment modal
+  //   fontSize: 12,
+  //   textAlign: 'center',
+  // },
+  // sentimentRange: { // REMOVED: No longer using separate sentiment modal
+  //   fontSize: 10,
+  //   textAlign: 'center',
+  //   marginTop: 2,
+  //   fontStyle: 'italic',
+  // },
   comparisonModalContent: {
     width: '95%',
     maxWidth: 500,
@@ -2422,6 +2427,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  sentimentBackButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
   },
 });
 
