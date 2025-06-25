@@ -43,6 +43,34 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // **ENHANCED RATING SYSTEM IMPORT**
 import { getRatingCategory, calculateDynamicRatingCategories } from '../../Components/EnhancedRatingSystem';
 
+// Helper functions for calculating range from percentile (moved from component)
+const getRatingRangeFromPercentile = (userMovies, percentile) => {
+  const sortedRatings = userMovies
+    .map(m => m.userRating || (m.eloRating / 100))
+    .filter(rating => rating && !isNaN(rating))
+    .sort((a, b) => a - b);
+
+  if (sortedRatings.length === 0) return [1, 10];
+
+  const lowIndex = Math.floor((percentile[0] / 100) * sortedRatings.length);
+  const highIndex = Math.floor((percentile[1] / 100) * sortedRatings.length);
+  
+  const lowRating = sortedRatings[Math.max(0, lowIndex)] || sortedRatings[0];
+  const highRating = sortedRatings[Math.min(highIndex, sortedRatings.length - 1)] || sortedRatings[sortedRatings.length - 1];
+  
+  return [lowRating, highRating];
+};
+
+const getDefaultRatingForCategory = (categoryKey) => {
+  const defaults = {
+    LOVED: 8.5,
+    LIKED: 7.0,
+    AVERAGE: 5.5,
+    DISLIKED: 3.0
+  };
+  return defaults[categoryKey] || 7.0;
+};
+
 // **DEBUG LOGGING**
 console.log('🏠 HomeScreen: Enhanced Rating System loaded');
 
@@ -617,8 +645,13 @@ function HomeScreen({
       return;
     }
     
-    // Not enough movies for comparison, use category average
-    const categoryAverage = (categoryInfo.range[0] + categoryInfo.range[1]) / 2;
+    // Not enough movies for comparison, use category average based on percentile
+    const categoryAverage = seen && seen.length > 0 ? 
+      (() => {
+        const range = getRatingRangeFromPercentile(seen, categoryInfo.percentile);
+        return (range[0] + range[1]) / 2;
+      })() :
+      getDefaultRatingForCategory(categoryKey);
     handleConfirmRating(categoryAverage);
   }, [seen, selectedMovie, genres]);
 
@@ -1873,7 +1906,13 @@ function HomeScreen({
                       {category.description}
                     </Text>
                     <Text style={[styles.sentimentRange, { color: colors.subText }]}>
-                      {category.range[0].toFixed(1)} - {category.range[1].toFixed(1)}
+                      {seen && seen.length > 0 ? 
+                        (() => {
+                          const range = getRatingRangeFromPercentile(seen, category.percentile);
+                          return `${range[0].toFixed(1)} - ${range[1].toFixed(1)}`;
+                        })() :
+                        `${category.percentile[0]}th - ${category.percentile[1]}th percentile`
+                      }
                     </Text>
                   </TouchableOpacity>
                 ))}

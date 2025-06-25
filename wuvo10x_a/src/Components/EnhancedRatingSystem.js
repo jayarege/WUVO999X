@@ -6,15 +6,60 @@ import { LinearGradient } from 'expo-linear-gradient';
 // Console log to verify file is loading
 console.log('✅ EnhancedRatingSystem component loaded successfully!');
 
+// Helper functions for percentile-based calculations
+const calculateMidRatingFromPercentile = (userMovies, percentile) => {
+  const sortedRatings = userMovies
+    .map(m => m.userRating || (m.eloRating / 100))
+    .filter(rating => rating && !isNaN(rating))
+    .sort((a, b) => a - b);
+
+  if (sortedRatings.length === 0) return 7.0;
+
+  const lowIndex = Math.floor((percentile[0] / 100) * sortedRatings.length);
+  const highIndex = Math.floor((percentile[1] / 100) * sortedRatings.length);
+  
+  const lowRating = sortedRatings[Math.max(0, lowIndex)] || sortedRatings[0];
+  const highRating = sortedRatings[Math.min(highIndex, sortedRatings.length - 1)] || sortedRatings[sortedRatings.length - 1];
+  
+  return (lowRating + highRating) / 2;
+};
+
+const getDefaultRatingForCategory = (categoryKey) => {
+  const defaults = {
+    LOVED: 8.5,
+    LIKED: 7.0,
+    AVERAGE: 5.5,
+    DISLIKED: 3.0
+  };
+  return defaults[categoryKey] || 7.0;
+};
+
+const getRatingRangeFromPercentile = (userMovies, percentile) => {
+  const sortedRatings = userMovies
+    .map(m => m.userRating || (m.eloRating / 100))
+    .filter(rating => rating && !isNaN(rating))
+    .sort((a, b) => a - b);
+
+  if (sortedRatings.length === 0) return [1, 10];
+
+  const lowIndex = Math.floor((percentile[0] / 100) * sortedRatings.length);
+  const highIndex = Math.floor((percentile[1] / 100) * sortedRatings.length);
+  
+  const lowRating = sortedRatings[Math.max(0, lowIndex)] || sortedRatings[0];
+  const highRating = sortedRatings[Math.min(highIndex, sortedRatings.length - 1)] || sortedRatings[sortedRatings.length - 1];
+  
+  return [lowRating, highRating];
+};
+
 // **DYNAMIC PERCENTILE-BASED RATING CATEGORIES**
 const calculateDynamicRatingCategories = (userMovies) => {
   if (!userMovies || userMovies.length === 0) {
-    // Fallback to default ranges if no user data
+    // Fallback to default percentiles if no user data
     return {
-      LOVED: { range: [8.5, 10], percentile: [75, 100], emoji: '❤️', color: '#4CAF50', borderColor: '#1B5E20', label: 'Loved it!', description: 'This was amazing!' },
-      LIKED: { range: [6.5, 8.4], percentile: [50, 74], emoji: '👍', color: '#4CAF50', borderColor: '#4CAF50', label: 'Liked it', description: 'Pretty good!' },
-      AVERAGE: { range: [4.5, 6.4], percentile: [25, 49], emoji: '🟡', color: '#FF9800', borderColor: '#FFC107', label: 'It was okay', description: 'Nothing special' },
-      DISLIKED: { range: [1, 4.4], percentile: [0, 24], emoji: '👎', color: '#F44336', borderColor: '#D32F2F', label: 'Disliked it', description: 'Not for me' }
+      LOVED: { percentile: [75, 100], emoji: '❤️', color: '#4CAF50', borderColor: '#1B5E20', label: 'Loved it!', description: 'This was amazing!' },
+      LIKED: { percentile: [50, 74], emoji: '👍', color: '#4CAF50', borderColor: '#4CAF50', label: 'Liked it', description: 'Pretty good!' },
+      AVERAGE: { percentile: [25, 49], emoji: '🟡', color: '#FF9800', borderColor: '#FFC107', label: 'It was okay', description: 'Nothing special' },
+      DISLIKED: { percentile: [0, 24], emoji: '👎', color: '#F44336', borderColor: '#D32F2F', label: 'Disliked it', description: 'Not for me' }
     };
   }
 
@@ -43,7 +88,6 @@ const calculateDynamicRatingCategories = (userMovies) => {
 
   return {
     LOVED: { 
-      range: [p75, maxRating], 
       percentile: [75, 100], 
       emoji: '❤️', 
       color: '#4CAF50',
@@ -52,7 +96,6 @@ const calculateDynamicRatingCategories = (userMovies) => {
       description: 'This was amazing!'
     },
     LIKED: { 
-      range: [p50, p75 - 0.1], 
       percentile: [50, 74], 
       emoji: '👍', 
       color: '#4CAF50',
@@ -61,7 +104,6 @@ const calculateDynamicRatingCategories = (userMovies) => {
       description: 'Pretty good!'
     },
     AVERAGE: { 
-      range: [p25, p50 - 0.1], 
       percentile: [25, 49], 
       emoji: '🟡', 
       color: '#FF9800',
@@ -70,7 +112,6 @@ const calculateDynamicRatingCategories = (userMovies) => {
       description: 'Nothing special'
     },
     DISLIKED: { 
-      range: [minRating, p25 - 0.1], 
       percentile: [0, 24], 
       emoji: '👎', 
       color: '#F44336',
@@ -355,11 +396,14 @@ const SentimentRatingModal = ({ visible, movie, onClose, onRatingSelect, colors,
     setSelectedCategory(categoryKey);
     
     const category = RATING_CATEGORIES[categoryKey];
-    const midRating = (category.range[0] + category.range[1]) / 2;
+    // Calculate mid-rating based on percentile position (default to 7.0 for new users)
+    const midRating = userMovies && userMovies.length > 0 ? 
+      calculateMidRatingFromPercentile(userMovies, category.percentile) : 
+      getDefaultRatingForCategory(categoryKey);
     
     const movieWithRating = { ...movie, suggestedRating: midRating };
     onRatingSelect(movieWithRating, categoryKey, midRating);
-  }, [movie, onRatingSelect, RATING_CATEGORIES]);
+  }, [movie, onRatingSelect, RATING_CATEGORIES, userMovies]);
 
   const renderSentimentButton = (categoryKey) => {
     const category = RATING_CATEGORIES[categoryKey];
@@ -396,7 +440,13 @@ const SentimentRatingModal = ({ visible, movie, onClose, onRatingSelect, colors,
           styles.sentimentRange,
           { color: isSelected ? 'rgba(255,255,255,0.6)' : colors.subText }
         ]}>
-          {category.range[0].toFixed(1)} - {category.range[1].toFixed(1)}
+          {userMovies && userMovies.length > 0 ? 
+            (() => {
+              const range = getRatingRangeFromPercentile(userMovies, category.percentile);
+              return `${range[0].toFixed(1)} - ${range[1].toFixed(1)}`;
+            })() :
+            `${category.percentile[0]}th - ${category.percentile[1]}th percentile`
+          }
         </Text>
       </TouchableOpacity>
     );
@@ -983,10 +1033,27 @@ const CompactRatingButton = ({
 const getRatingCategory = (rating, userMovies) => {
   if (!rating) return null;
   
+  if (!userMovies || userMovies.length === 0) {
+    // Use default thresholds for new users
+    const categories = calculateDynamicRatingCategories([]);
+    if (rating >= 8.5) return { key: 'LOVED', ...categories.LOVED };
+    if (rating >= 6.5) return { key: 'LIKED', ...categories.LIKED };
+    if (rating >= 4.5) return { key: 'AVERAGE', ...categories.AVERAGE };
+    return { key: 'DISLIKED', ...categories.DISLIKED };
+  }
+  
   const categories = calculateDynamicRatingCategories(userMovies);
+  const sortedRatings = userMovies
+    .map(m => m.userRating || (m.eloRating / 100))
+    .filter(r => r && !isNaN(r))
+    .sort((a, b) => a - b);
+  
+  // Find rating's percentile position
+  const position = sortedRatings.findIndex(r => r >= rating);
+  const percentile = position === -1 ? 100 : (position / sortedRatings.length) * 100;
   
   for (const [key, category] of Object.entries(categories)) {
-    if (rating >= category.range[0] && rating <= category.range[1]) {
+    if (percentile >= category.percentile[0] && percentile <= category.percentile[1]) {
       return { key, ...category };
     }
   }
