@@ -134,6 +134,7 @@ function HomeScreen({
   const [currentComparison, setCurrentComparison] = useState(0);
   const [comparisonResults, setComparisonResults] = useState([]);
   const [isComparisonComplete, setIsComparisonComplete] = useState(false);
+  const [showSentimentButtons, setShowSentimentButtons] = useState(false);
   
   // **ANIMATION SYSTEM - ENGINEER TEAM 4-6**
   const slideAnim = useRef(new Animated.Value(300)).current;
@@ -142,6 +143,10 @@ function HomeScreen({
   const [popularIndex, setPopularIndex] = useState(0);
   const autoScrollPopular = useRef(null);
   const scrollX = useRef(new Animated.Value(0)).current;
+  
+  // **FADE ANIMATION STATE FOR SENTIMENT BUTTONS**
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const sentimentFadeAnim = useRef(new Animated.Value(0)).current;
   const position = useRef(new Animated.ValueXY()).current;
   const scrollRef = useRef(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -805,7 +810,23 @@ function HomeScreen({
     setCurrentComparison(0);
     setComparisonResults([]);
     setIsComparisonComplete(false);
-  }, []);
+    
+    // Reset sentiment buttons and fade back to action buttons
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(sentimentFadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      })
+    ]).start(() => {
+      setShowSentimentButtons(false);
+    });
+  }, [fadeAnim, sentimentFadeAnim]);
 
   // ============================================================================
   // **EVENT HANDLERS - ENGINEER TEAM 13**
@@ -1841,28 +1862,84 @@ function HomeScreen({
               </View>
               
               <View style={modalStyles.buttonRow}>
-                <TouchableOpacity 
-                  style={[modalStyles.actionButton, { flex: 1, marginHorizontal: 4 }]}
-                  onPress={openRatingModal}
+                {/* **ACTION BUTTONS** */}
+                <Animated.View 
+                  style={[
+                    { 
+                      opacity: fadeAnim,
+                      position: showSentimentButtons ? 'absolute' : 'relative',
+                      width: '100%',
+                      flexDirection: 'row'
+                    }
+                  ]}
+                  pointerEvents={showSentimentButtons ? 'none' : 'auto'}
                 >
-                  <Text style={modalStyles.actionButtonText}>Rate</Text>
-                </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[modalStyles.actionButton, { flex: 1, marginHorizontal: 4 }]}
+                    onPress={openRatingModal}
+                  >
+                    <Text style={modalStyles.actionButtonText}>Rate</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[modalStyles.actionButton, { flex: 1, marginHorizontal: 4 }]}
+                    onPress={handleWatchlistToggle}
+                  >
+                    <Text style={modalStyles.actionButtonText}>
+                      {unseen.some(movie => movie.id === selectedMovie?.id) ? 'Remove from Watchlist' : 'Watchlist'}
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[modalStyles.actionButton, { flex: 1, marginHorizontal: 4 }]}
+                    onPress={handleNotInterested}
+                  >
+                    <Text style={modalStyles.actionButtonText}>Not Interested</Text>
+                  </TouchableOpacity>
+                </Animated.View>
                 
-                <TouchableOpacity 
-                  style={[modalStyles.actionButton, { flex: 1, marginHorizontal: 4 }]}
-                  onPress={handleWatchlistToggle}
-                >
-                  <Text style={modalStyles.actionButtonText}>
-                    {unseen.some(movie => movie.id === selectedMovie?.id) ? 'Remove from Watchlist' : 'Watchlist'}
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[modalStyles.actionButton, { flex: 1, marginHorizontal: 4 }]}
-                  onPress={handleNotInterested}
-                >
-                  <Text style={modalStyles.actionButtonText}>Not Interested</Text>
-                </TouchableOpacity>
+                {/* **SENTIMENT BUTTONS** */}
+                {showSentimentButtons && (
+                  <Animated.View 
+                    style={[
+                      { 
+                        opacity: sentimentFadeAnim,
+                        position: 'absolute',
+                        width: '100%',
+                        flexDirection: 'row',
+                        flexWrap: 'wrap',
+                        justifyContent: 'space-between'
+                      }
+                    ]}
+                  >
+                    {Object.entries(calculateDynamicRatingCategories(seen)).map(([categoryKey, category]) => (
+                      <TouchableOpacity
+                        key={categoryKey}
+                        style={[
+                          styles.sentimentButton,
+                          { 
+                            backgroundColor: 'transparent',
+                            borderColor: category.borderColor || category.color,
+                            borderWidth: 2,
+                            flex: 1,
+                            marginHorizontal: 2,
+                            minHeight: 60
+                          }
+                        ]}
+                        onPress={() => handleSentimentSelect(categoryKey)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={{ fontSize: 20, marginBottom: 4 }}>{category.emoji}</Text>
+                        <Text style={[
+                          styles.sentimentLabel,
+                          { color: category.color, fontSize: 12, textAlign: 'center' }
+                        ]}>
+                          {category.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </Animated.View>
+                )}
               </View>
               
               <TouchableOpacity onPress={closeDetailModal} style={modalStyles.cancelButtonContainer}>
@@ -2331,6 +2408,20 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  
+  // **Sentiment Button Styles**
+  sentimentButton: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 4,
+  },
+  sentimentLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
 

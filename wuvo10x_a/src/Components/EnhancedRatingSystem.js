@@ -1,7 +1,20 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Modal, StyleSheet, Alert, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, StyleSheet, Alert, Image, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+
+// Import Wildcard ELO calculation utilities
+// These will be used for more sophisticated rating calculations
+const calculateKFactor = (gamesPlayed) => {
+  if (gamesPlayed < 5) return 0.5;
+  if (gamesPlayed < 10) return 0.25;
+  if (gamesPlayed < 20) return 0.125;
+  return 0.1;
+};
+
+const calculateExpectedWinProbability = (ratingA, ratingB) => {
+  return 1 / (1 + Math.pow(10, (ratingB - ratingA) / 4));
+};
 
 // Console log to verify file is loading
 console.log('✅ EnhancedRatingSystem component loaded successfully!');
@@ -218,9 +231,10 @@ const WildcardComparison = ({
       
       console.log(`🎯 Comparison Complete: ${newMovieWins}/3 wins, Final Rating: ${finalRating}`);
       
+      // Show results for 2 seconds, then complete with calculated rating
       setTimeout(() => {
         onComparisonComplete(finalRating);
-      }, 1500);
+      }, 2500);
     }
   }, [currentComparison, comparisonResults, comparisonMovies, newMovie, categoryInfo, onComparisonComplete]);
 
@@ -233,20 +247,29 @@ const WildcardComparison = ({
 
     const avgComparisonRating = comparisonRatings.reduce((sum, r) => sum + r, 0) / comparisonRatings.length;
     
-    // Adjust rating based on wins vs losses
-    if (wins === 3) {
-      // Won all comparisons - higher end of category
-      return Math.min(10, avgComparisonRating + 0.5);
-    } else if (wins === 2) {
-      // Won majority - middle-high of category  
-      return Math.min(10, avgComparisonRating + 0.2);
-    } else if (wins === 1) {
-      // Won minority - middle-low of category
-      return Math.max(1, avgComparisonRating - 0.2);
-    } else {
-      // Won nothing - lower end of category
-      return Math.max(1, avgComparisonRating - 0.5);
-    }
+    // Use Wildcard-style ELO calculation approach
+    // Calculate expected win probability for each comparison
+    let totalExpectedWins = 0;
+    results.forEach(result => {
+      const comparisonMovie = result.winner === newMovie ? result.loser : result.winner;
+      const comparisonRating = comparisonMovie.userRating || (comparisonMovie.eloRating / 100);
+      const expectedWinProbability = 1 / (1 + Math.pow(10, (comparisonRating - avgComparisonRating) / 4));
+      totalExpectedWins += expectedWinProbability;
+    });
+    
+    // Adjust rating based on actual vs expected performance
+    const performance = wins - totalExpectedWins;
+    const baseRating = suggestedRating || avgComparisonRating;
+    
+    // Apply ELO-style rating adjustment
+    const kFactor = 0.3; // Moderate adjustment for rating
+    const ratingAdjustment = kFactor * performance;
+    
+    const finalRating = Math.max(1, Math.min(10, baseRating + ratingAdjustment));
+    
+    console.log(`📊 ELO-style calculation: Base=${baseRating.toFixed(2)}, Wins=${wins}/3, Expected=${totalExpectedWins.toFixed(2)}, Adjustment=${ratingAdjustment.toFixed(2)}, Final=${finalRating.toFixed(2)}`);
+    
+    return finalRating;
   };
 
   const resetComparison = () => {
@@ -286,47 +309,63 @@ const WildcardComparison = ({
               <View style={styles.moviesComparison}>
                 {/* New Movie */}
                 <TouchableOpacity 
-                  style={styles.movieComparisonCard}
+                  style={[styles.movieComparisonCard, styles.wildcardStyleCard]}
                   onPress={() => handleComparison('new')}
                   activeOpacity={0.8}
                 >
-                  <Image
-                    source={{ uri: `https://image.tmdb.org/t/p/w500${newMovie?.poster_path}` }}
-                    style={styles.comparisonPoster}
-                    resizeMode="cover"
-                  />
+                  <View style={styles.posterContainer}>
+                    <Image
+                      source={{ uri: `https://image.tmdb.org/t/p/w500${newMovie?.poster_path}` }}
+                      style={styles.comparisonPoster}
+                      resizeMode="cover"
+                    />
+                    <View style={[styles.newMovieBadge, { backgroundColor: colors.accent }]}>
+                      <Text style={styles.newMovieText}>NEW</Text>
+                    </View>
+                  </View>
                   <Text style={[styles.movieCardName, { color: colors.text }]} numberOfLines={2}>
                     {newMovie?.title || newMovie?.name}
                   </Text>
                   <Text style={[styles.movieCardYear, { color: colors.subText }]}>
                     {newMovie?.release_date ? new Date(newMovie.release_date).getFullYear() : 'N/A'}
                   </Text>
+                  <Text style={[styles.categoryBadge, { color: categoryInfo?.color }]}>
+                    {categoryInfo?.emoji} {categoryInfo?.label}
+                  </Text>
                 </TouchableOpacity>
                 
-                {/* VS Indicator */}
-                <View style={styles.vsIndicator}>
-                  <Text style={[styles.vsText, { color: colors.accent }]}>VS</Text>
+                {/* VS Indicator - Wildcard Style */}
+                <View style={styles.vsIndicatorWildcard}>
+                  <View style={[styles.vsCircle, { borderColor: colors.accent }]}>
+                    <Text style={[styles.vsText, { color: colors.accent }]}>VS</Text>
+                  </View>
+                  <Text style={[styles.comparisonCountText, { color: colors.subText }]}>
+                    {currentComparison + 1} of 3
+                  </Text>
                 </View>
                 
                 {/* Comparison Movie */}
                 <TouchableOpacity 
-                  style={styles.movieComparisonCard}
+                  style={[styles.movieComparisonCard, styles.wildcardStyleCard]}
                   onPress={() => handleComparison('comparison')}
                   activeOpacity={0.8}
                 >
-                  <Image
-                    source={{ uri: `https://image.tmdb.org/t/p/w500${currentComparisonMovie?.poster_path}` }}
-                    style={styles.comparisonPoster}
-                    resizeMode="cover"
-                  />
+                  <View style={styles.posterContainer}>
+                    <Image
+                      source={{ uri: `https://image.tmdb.org/t/p/w500${currentComparisonMovie?.poster_path}` }}
+                      style={styles.comparisonPoster}
+                      resizeMode="cover"
+                    />
+                  </View>
                   <Text style={[styles.movieCardName, { color: colors.text }]} numberOfLines={2}>
                     {currentComparisonMovie?.title || currentComparisonMovie?.name}
                   </Text>
                   <Text style={[styles.movieCardYear, { color: colors.subText }]}>
                     {currentComparisonMovie?.release_date ? new Date(currentComparisonMovie.release_date).getFullYear() : 'N/A'}
                   </Text>
-                  <View style={[styles.ratingBadge, { backgroundColor: categoryInfo?.color }]}>
-                    <Text style={styles.ratingText}>
+                  <View style={[styles.ratingBadgeWildcard, { backgroundColor: categoryInfo?.color }]}>
+                    <Ionicons name="star" size={12} color="#FFF" />
+                    <Text style={styles.ratingTextWildcard}>
                       {currentComparisonMovie?.userRating?.toFixed(1)}
                     </Text>
                   </View>
@@ -349,23 +388,62 @@ const WildcardComparison = ({
               </View>
             </>
           ) : (
-            // Completion Screen
+            // Completion Screen - Wildcard Style with calculated rating preview
             <View style={styles.completionScreen}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
-                🎯 Rating Complete!
-              </Text>
-              <Text style={[styles.comparisonSubtitle, { color: colors.subText }]}>
-                Based on your {comparisonResults.filter(r => r.userChoice === 'new').length}/3 comparisons
-              </Text>
-              
-              <View style={styles.resultsContainer}>
-                {comparisonResults.map((result, index) => (
-                  <View key={index} style={styles.resultRow}>
-                    <Text style={[styles.resultText, { color: colors.text }]}>
-                      {result.comparison}. vs {result.loser.title}: {result.userChoice === 'new' ? '✅ Won' : '❌ Lost'}
+              <View style={[styles.completionHeader, { borderBottomColor: colors.border?.color || '#333' }]}>
+                <Text style={[styles.completionTitle, { color: colors.text }]}>
+                  🎯 Rating Calculated!
+                </Text>
+                <View style={[styles.winsBadge, { backgroundColor: colors.accent }]}>
+                  <Text style={styles.winsText}>
+                    {comparisonResults.filter(r => r.userChoice === 'new').length}/3 Wins
+                  </Text>
+                </View>
+                
+                {/* Show calculated rating preview */}
+                <View style={[styles.ratingPreview, { borderColor: categoryInfo?.color }]}>
+                  <Text style={[styles.ratingPreviewLabel, { color: colors.subText }]}>Calculated Rating:</Text>
+                  <View style={styles.ratingPreviewValue}>
+                    <Ionicons name="star" size={16} color={categoryInfo?.color} />
+                    <Text style={[styles.ratingPreviewText, { color: categoryInfo?.color }]}>
+                      {calculateRatingFromComparisons(
+                        comparisonResults.filter(r => r.userChoice === 'new').length,
+                        comparisonResults,
+                        categoryInfo
+                      ).toFixed(1)}/10
                     </Text>
                   </View>
+                </View>
+              </View>
+              
+              <View style={styles.resultsContainer}>
+                <Text style={[styles.resultsHeader, { color: colors.text }]}>How it performed:</Text>
+                {comparisonResults.map((result, index) => (
+                  <View key={index} style={[styles.resultRowWildcard, { borderLeftColor: result.userChoice === 'new' ? '#4CAF50' : '#F44336' }]}>
+                    <View style={styles.resultContent}>
+                      <Text style={[styles.resultNumber, { color: colors.accent }]}>
+                        #{result.comparison}
+                      </Text>
+                      <Text style={[styles.resultText, { color: colors.text }]}>
+                        vs {result.loser.title || result.loser.name}
+                      </Text>
+                      <View style={[styles.resultBadge, { backgroundColor: result.userChoice === 'new' ? '#4CAF50' : '#F44336' }]}>
+                        <Text style={styles.resultBadgeText}>
+                          {result.userChoice === 'new' ? 'WON' : 'LOST'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
                 ))}
+                
+                <View style={[styles.performanceSummary, { backgroundColor: colors.card || 'rgba(255,255,255,0.05)' }]}>
+                  <Text style={[styles.performanceSummaryText, { color: colors.subText }]}>
+                    Performance vs similar {categoryInfo?.label.toLowerCase()} movies: 
+                    <Text style={{ color: categoryInfo?.color, fontWeight: 'bold' }}>
+                      {comparisonResults.filter(r => r.userChoice === 'new').length > 1.5 ? 'Above Average' : 'Below Average'}
+                    </Text>
+                  </Text>
+                </View>
               </View>
             </View>
           )}
@@ -435,18 +513,6 @@ const SentimentRatingModal = ({ visible, movie, onClose, onRatingSelect, colors,
           { color: isSelected ? 'rgba(255,255,255,0.8)' : colors.subText }
         ]}>
           {category.description}
-        </Text>
-        <Text style={[
-          styles.sentimentRange,
-          { color: isSelected ? 'rgba(255,255,255,0.6)' : colors.subText }
-        ]}>
-          {userMovies && userMovies.length > 0 ? 
-            (() => {
-              const range = getRatingRangeFromPercentile(userMovies, category.percentile);
-              return `${range[0].toFixed(1)} - ${range[1].toFixed(1)}`;
-            })() :
-            `${category.percentile[0]}th - ${category.percentile[1]}th percentile`
-          }
         </Text>
       </TouchableOpacity>
     );
@@ -537,6 +603,7 @@ const EnhancedRatingButton = ({
       movie.id
     );
     
+    // Always route through Wildcard UI for 3 comparisons if enough movies exist 
     if (categoryMovies.length >= 3) {
       // Get best 3 comparison movies
       const scoredMovies = categoryMovies.map(m => ({
@@ -553,9 +620,16 @@ const EnhancedRatingButton = ({
       return;
     }
     
-    // Not enough movies for comparison, use category average
-    const categoryAverage = (categoryInfo.range[0] + categoryInfo.range[1]) / 2;
-    handleConfirmRating(categoryAverage);
+    // Not enough movies for comparison, use category average but still show in wildcard-style UI
+    const categoryAverage = calculateMidRatingFromPercentile(seen, categoryInfo.percentile);
+    // Create mock comparison movies if needed to demonstrate the flow
+    const mockComparisons = seen.slice(0, 3).map(m => ({ ...m, comparisonScore: 50 }));
+    if (mockComparisons.length >= 3) {
+      setComparisonMovies(mockComparisons);
+      setComparisonModalVisible(true);
+    } else {
+      handleConfirmRating(categoryAverage);
+    }
   }, [seen, movie, genres]);
 
   const handleComparisonComplete = useCallback((finalRating) => {
@@ -568,14 +642,17 @@ const EnhancedRatingButton = ({
     console.log('✅ Confirming rating:', finalRating, 'for:', movie?.title);
     if (!movie || !finalRating) return;
     
+    // Create movie item with Wildcard-style ELO integration
     const newItem = {
       ...movie,
       userRating: finalRating,
-      eloRating: finalRating * 10,
+      eloRating: finalRating * 100, // Convert to ELO scale (100-1000)
       comparisonHistory: [],
-      comparisonWins: 0,
+      comparisonWins: comparisonMovies.length > 0 ? comparisonResults?.filter(r => r.userChoice === 'new').length || 0 : 0,
+      gamesPlayed: (movie.gamesPlayed || 0) + (comparisonMovies.length > 0 ? 3 : 0), // Track comparison games
       mediaType: mediaType,
-      ratingCategory: selectedCategory
+      ratingCategory: selectedCategory,
+      ratingMethod: 'enhanced_comparison' // Mark as using enhanced system
     };
     
     if (isAlreadyRated) {
@@ -595,20 +672,22 @@ const EnhancedRatingButton = ({
     }
     
     const RATING_CATEGORIES = calculateDynamicRatingCategories(seen);
+    const categoryLabel = RATING_CATEGORIES[selectedCategory]?.label || 'rated';
+    const emoji = RATING_CATEGORIES[selectedCategory]?.emoji || '⭐';
     
     Alert.alert(
-      "Rating Added!", 
-      `You ${RATING_CATEGORIES[selectedCategory]?.label?.toLowerCase()} "${movie.title}" (${finalRating.toFixed(1)}/10)`,
+      `${emoji} Rating Complete!`, 
+      `You ${categoryLabel.toLowerCase()} "${movie.title}" (${finalRating.toFixed(1)}/10)\n\nCalculated through ${comparisonMovies.length > 0 ? '3 movie comparisons' : 'category average'}`,
       [
         {
-          text: "OK",
+          text: "Perfect!",
           onPress: () => {
-            console.log('🏠 Returning to home screen after rating');
+            console.log('🏠 Enhanced rating completed, returning to app');
           }
         }
       ]
     );
-  }, [movie, selectedCategory, isAlreadyRated, onUpdateRating, onAddToSeen, mediaType, seen]);
+  }, [movie, selectedCategory, isAlreadyRated, onUpdateRating, onAddToSeen, mediaType, seen, comparisonMovies, comparisonResults]);
 
   const handleCloseModals = useCallback(() => {
     console.log('🚫 Closing modals');
@@ -826,12 +905,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
   },
-  sentimentRange: {
-    fontSize: 10,
-    textAlign: 'center',
-    marginTop: 2,
-    fontStyle: 'italic',
-  },
 
   // Comparison Modal
   comparisonModalContent: {
@@ -895,21 +968,89 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-
-  // **Wildcard-Style Comparison Modal**
+  
+  // **Wildcard-Style Comparison Cards**
+  wildcardStyleCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  posterContainer: {
+    position: 'relative',
+    marginBottom: 12,
+  },
   movieComparisonCard: {
     flex: 1,
     alignItems: 'center',
     padding: 16,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     marginHorizontal: 8,
   },
   comparisonPoster: {
     width: 120,
     height: 180,
     borderRadius: 8,
-    marginBottom: 12,
+  },
+  newMovieBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    elevation: 2,
+  },
+  newMovieText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  categoryBadge: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+
+  // **Enhanced VS Indicator**
+  vsIndicatorWildcard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 16,
+  },
+  vsCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  comparisonCountText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  ratingBadgeWildcard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  ratingTextWildcard: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 12,
+    marginLeft: 4,
   },
   progressIndicator: {
     flexDirection: 'row',
@@ -923,24 +1064,105 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     marginHorizontal: 4,
   },
+  // **Enhanced Completion Screen**
   completionScreen: {
-    alignItems: 'center',
     paddingVertical: 20,
   },
+  completionHeader: {
+    alignItems: 'center',
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    marginBottom: 16,
+  },
+  completionTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  winsBadge: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+  },
+  winsText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
   resultsContainer: {
-    marginTop: 20,
     width: '100%',
   },
-  resultRow: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    marginVertical: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  resultsHeader: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  resultRowWildcard: {
+    marginVertical: 6,
+    borderLeftWidth: 4,
     borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  resultContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+  },
+  resultNumber: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    width: 30,
   },
   resultText: {
+    flex: 1,
     fontSize: 14,
+    marginLeft: 8,
+  },
+  resultBadge: {
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  resultBadgeText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  
+  // **Rating Preview & Performance Summary**
+  ratingPreview: {
+    marginTop: 16,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    alignItems: 'center',
+  },
+  ratingPreviewLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  ratingPreviewValue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  ratingPreviewText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 4,
+  },
+  performanceSummary: {
+    marginTop: 16,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  performanceSummaryText: {
+    fontSize: 13,
     textAlign: 'center',
+    lineHeight: 18,
   },
 
   // Action Buttons
