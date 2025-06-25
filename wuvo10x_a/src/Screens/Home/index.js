@@ -15,6 +15,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,11 +41,10 @@ import { filterAdultContent, filterSearchResults, isContentSafe } from '../../ut
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // **ENHANCED RATING SYSTEM IMPORT**
-import { EnhancedRatingButton } from '../../Components/EnhancedRatingSystem';
+import { getRatingCategory, calculateDynamicRatingCategories } from '../../Components/EnhancedRatingSystem';
 
 // **DEBUG LOGGING**
 console.log('🏠 HomeScreen: Enhanced Rating System loaded');
-console.log('✅ EnhancedRatingButton component:', EnhancedRatingButton);
 
 const { width } = Dimensions.get('window');
 
@@ -97,6 +97,15 @@ function HomeScreen({
   const [movieCredits, setMovieCredits] = useState(null);
   const [movieProviders, setMovieProviders] = useState(null);
   const [notInterestedMovies, setNotInterestedMovies] = useState([]);
+  
+  // **ENHANCED RATING SYSTEM STATE**
+  const [sentimentModalVisible, setSentimentModalVisible] = useState(false);
+  const [comparisonModalVisible, setComparisonModalVisible] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [comparisonMovies, setComparisonMovies] = useState([]);
+  const [currentComparison, setCurrentComparison] = useState(0);
+  const [comparisonResults, setComparisonResults] = useState([]);
+  const [isComparisonComplete, setIsComparisonComplete] = useState(false);
   
   // **ANIMATION SYSTEM - ENGINEER TEAM 4-6**
   const slideAnim = useRef(new Animated.Value(300)).current;
@@ -570,6 +579,202 @@ function HomeScreen({
   }, [position.x]);
 
   // ============================================================================
+  // **ENHANCED RATING SYSTEM LOGIC - ENGINEER TEAM 12.5**
+  // ============================================================================
+
+  const handleSentimentSelect = useCallback((categoryKey) => {
+    console.log('🎭 User selected sentiment:', categoryKey);
+    setSelectedCategory(categoryKey);
+    setSentimentModalVisible(false);
+    
+    // Calculate dynamic categories based on user's rating history
+    const RATING_CATEGORIES = calculateDynamicRatingCategories(seen);
+    const categoryInfo = RATING_CATEGORIES[categoryKey];
+    
+    // Find movies in the same percentile range for comparison
+    const categoryMovies = getMoviesInPercentileRange(
+      seen,
+      categoryInfo.percentile,
+      selectedMovie.id
+    );
+    
+    if (categoryMovies.length >= 3) {
+      // Get best 3 comparison movies
+      const scoredMovies = categoryMovies.map(m => ({
+        ...m,
+        comparisonScore: calculateComparisonScore(m, selectedMovie, genres)
+      }));
+      
+      const bestComparisons = scoredMovies
+        .sort((a, b) => b.comparisonScore - a.comparisonScore)
+        .slice(0, 3);
+      
+      setComparisonMovies(bestComparisons);
+      setCurrentComparison(0);
+      setComparisonResults([]);
+      setIsComparisonComplete(false);
+      setComparisonModalVisible(true);
+      return;
+    }
+    
+    // Not enough movies for comparison, use category average
+    const categoryAverage = (categoryInfo.range[0] + categoryInfo.range[1]) / 2;
+    handleConfirmRating(categoryAverage);
+  }, [seen, selectedMovie, genres]);
+
+  const getMoviesInPercentileRange = useCallback((userMovies, targetPercentile, excludeMovieId) => {
+    if (!userMovies || userMovies.length === 0) return [];
+    
+    const sortedMovies = [...userMovies]
+      .filter(movie => movie.id !== excludeMovieId && movie.userRating)
+      .sort((a, b) => b.userRating - a.userRating);
+    
+    if (sortedMovies.length === 0) return [];
+    
+    const totalMovies = sortedMovies.length;
+    const startIndex = Math.floor((targetPercentile[0] / 100) * totalMovies);
+    const endIndex = Math.ceil((targetPercentile[1] / 100) * totalMovies);
+    
+    return sortedMovies.slice(startIndex, Math.min(endIndex, totalMovies));
+  }, []);
+
+  const calculateComparisonScore = useCallback((movie, newMovie, genres) => {
+    let score = 0;
+    
+    // Genre similarity (highest weight)
+    const newMovieGenres = new Set(newMovie.genre_ids || []);
+    const movieGenres = new Set(movie.genre_ids || []);
+    const genreIntersection = [...newMovieGenres].filter(g => movieGenres.has(g));
+    score += (genreIntersection.length / Math.max(newMovieGenres.size, 1)) * 40;
+    
+    // Release year proximity (medium weight)
+    const newYear = new Date(newMovie.release_date || '2000').getFullYear();
+    const movieYear = new Date(movie.release_date || '2000').getFullYear();
+    const yearDiff = Math.abs(newYear - movieYear);
+    score += Math.max(0, 20 - yearDiff) * 0.5;
+    
+    // Rating proximity within category (low weight)
+    const ratingDiff = Math.abs(7 - movie.userRating);
+    score += Math.max(0, 10 - ratingDiff * 2);
+    
+    return score;
+  }, []);
+
+  const handleComparison = useCallback((winner) => {
+    const currentComparisonMovie = comparisonMovies[currentComparison];
+    const result = {
+      comparison: currentComparison + 1,
+      winner: winner === 'new' ? selectedMovie : currentComparisonMovie,
+      loser: winner === 'new' ? currentComparisonMovie : selectedMovie,
+      userChoice: winner
+    };
+
+    const newResults = [...comparisonResults, result];
+    setComparisonResults(newResults);
+
+    if (currentComparison < 2) {
+      // Move to next comparison
+      setCurrentComparison(currentComparison + 1);
+    } else {
+      // All comparisons complete
+      setIsComparisonComplete(true);
+      
+      // Calculate final rating based on comparison results
+      const newMovieWins = newResults.filter(r => r.userChoice === 'new').length;
+      const finalRating = calculateRatingFromComparisons(newMovieWins, newResults);
+      
+      console.log(`🎯 Comparison Complete: ${newMovieWins}/3 wins, Final Rating: ${finalRating}`);
+      
+      setTimeout(() => {
+        setComparisonModalVisible(false);
+        handleConfirmRating(finalRating);
+      }, 1500);
+    }
+  }, [currentComparison, comparisonResults, comparisonMovies, selectedMovie]);
+
+  const calculateRatingFromComparisons = useCallback((wins, results) => {
+    // Get the comparison movies' ratings
+    const comparisonRatings = results.map(r => {
+      const movie = r.winner === selectedMovie ? r.loser : r.winner;
+      return movie.userRating || (movie.eloRating / 100);
+    });
+
+    const avgComparisonRating = comparisonRatings.reduce((sum, r) => sum + r, 0) / comparisonRatings.length;
+    
+    // Adjust rating based on wins vs losses
+    if (wins === 3) {
+      // Won all comparisons - higher end of category
+      return Math.min(10, avgComparisonRating + 0.5);
+    } else if (wins === 2) {
+      // Won majority - middle-high of category  
+      return Math.min(10, avgComparisonRating + 0.2);
+    } else if (wins === 1) {
+      // Won minority - middle-low of category
+      return Math.max(1, avgComparisonRating - 0.2);
+    } else {
+      // Won nothing - lower end of category
+      return Math.max(1, avgComparisonRating - 0.5);
+    }
+  }, [selectedMovie]);
+
+  const handleConfirmRating = useCallback((finalRating) => {
+    console.log('✅ Confirming rating:', finalRating, 'for:', selectedMovie?.title);
+    if (!selectedMovie || !finalRating) return;
+    
+    const ratedMovie = {
+      id: selectedMovie.id,
+      title: selectedMovie.title || selectedMovie.name,
+      poster: selectedMovie.poster_path || selectedMovie.poster,
+      poster_path: selectedMovie.poster_path,
+      score: selectedMovie.vote_average || selectedMovie.score || 0,
+      vote_average: selectedMovie.vote_average,
+      voteCount: selectedMovie.vote_count || 0,
+      release_date: selectedMovie.release_date || selectedMovie.first_air_date,
+      genre_ids: selectedMovie.genre_ids || [],
+      overview: selectedMovie.overview || "",
+      adult: selectedMovie.adult || false,
+      userRating: finalRating,
+      eloRating: finalRating * 100,
+      comparisonHistory: [],
+      comparisonWins: 0,
+      mediaType: contentType === 'movies' ? 'movie' : 'tv',
+      ratingCategory: selectedCategory
+    };
+    
+    onAddToSeen(ratedMovie);
+    
+    // Refresh home screen data
+    fetchRecentReleases();
+    fetchPopularMovies();
+    fetchAIRecommendations();
+    
+    // Reset state
+    setSelectedCategory(null);
+    setComparisonMovies([]);
+    setCurrentComparison(0);
+    setComparisonResults([]);
+    setIsComparisonComplete(false);
+    
+    const RATING_CATEGORIES = calculateDynamicRatingCategories(seen);
+    
+    Alert.alert(
+      "Rating Added!", 
+      `You ${RATING_CATEGORIES[selectedCategory]?.label?.toLowerCase()} "${selectedMovie.title}" (${finalRating.toFixed(1)}/10)`,
+      [{ text: "OK" }]
+    );
+  }, [selectedMovie, selectedCategory, onAddToSeen, contentType, seen, fetchRecentReleases, fetchPopularMovies, fetchAIRecommendations]);
+
+  const handleCloseEnhancedModals = useCallback(() => {
+    setSentimentModalVisible(false);
+    setComparisonModalVisible(false);
+    setSelectedCategory(null);
+    setComparisonMovies([]);
+    setCurrentComparison(0);
+    setComparisonResults([]);
+    setIsComparisonComplete(false);
+  }, []);
+
+  // ============================================================================
   // **EVENT HANDLERS - ENGINEER TEAM 13**
   // ============================================================================
 
@@ -595,14 +800,8 @@ function HomeScreen({
 
   const openRatingModal = useCallback(() => {
     setMovieDetailModalVisible(false);
-    setRatingInput('');
-    setRatingModalVisible(true);
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  }, [slideAnim]);
+    setSentimentModalVisible(true);
+  }, []);
 
   const closeRatingModal = useCallback(() => {
     Animated.timing(slideAnim, {
@@ -849,6 +1048,14 @@ function HomeScreen({
     return matchPercentage;
   }, [topGenres]);
 
+  const getRatingBorderColor = useCallback((movie) => {
+    const ratedMovie = seen?.find(item => item.id === movie?.id);
+    if (!ratedMovie?.userRating) return 'transparent';
+    
+    const category = getRatingCategory(ratedMovie.userRating, seen);
+    return category?.borderColor || 'transparent';
+  }, [seen]);
+
   // ============================================================================
   // **PAN RESPONDER SYSTEM**
   // ============================================================================
@@ -913,7 +1120,13 @@ function HomeScreen({
           },
         ]}
       >
-        <View style={homeStyles.movieCardBorder}>
+        <View style={[
+          homeStyles.movieCardBorder,
+          { 
+            borderColor: getRatingBorderColor(item),
+            borderWidth: getRatingBorderColor(item) !== 'transparent' ? 3 : 0
+          }
+        ]}>
           <TouchableOpacity
             style={homeStyles.enhancedCard}
             activeOpacity={0.7}
@@ -966,10 +1179,16 @@ function HomeScreen({
         </View>
       </Animated.View>
     );
-  }, [getCardScale, getCardRotation, calculateMatchPercentage, position.x, homeStyles, handleMovieSelect, colors]);
+  }, [getCardScale, getCardRotation, calculateMatchPercentage, position.x, homeStyles, handleMovieSelect, colors, getRatingBorderColor]);
 
   const renderMovieCard = useCallback(({ item }) => (
-    <View style={homeStyles.movieCardBorder}>
+    <View style={[
+      homeStyles.movieCardBorder,
+      { 
+        borderColor: getRatingBorderColor(item),
+        borderWidth: getRatingBorderColor(item) !== 'transparent' ? 3 : 0
+      }
+    ]}>
       <TouchableOpacity 
         style={homeStyles.enhancedCard}
         activeOpacity={0.7}
@@ -1005,22 +1224,25 @@ function HomeScreen({
             </View>
           </View>
         </View>
-        <TouchableOpacity
-          style={homeStyles.quickRateButton}
-          onPress={() => handleMovieSelect(item)}
-        >
-          <Ionicons name="information-circle" size={16} color="#FFFFFF" />
-        </TouchableOpacity>
       </TouchableOpacity>
     </View>
-  ), [homeStyles, handleMovieSelect, colors]);
+  ), [homeStyles, handleMovieSelect, colors, getRatingBorderColor]);
 
   // **🎯 CRITICAL ENHANCED RATING BUTTON INTEGRATION**
   const renderRecentReleaseCard = useCallback(({ item }) => {
     console.log('🎬 Rendering recent release card for:', item?.title, 'Already seen:', item?.alreadySeen);
     
     return (
-      <View style={[homeStyles.movieCardBorder, { width: 320, alignSelf: 'center', height: 150 }]}>
+      <View style={[
+        homeStyles.movieCardBorder, 
+        { 
+          width: 320, 
+          alignSelf: 'center', 
+          height: 150,
+          borderColor: getRatingBorderColor(item),
+          borderWidth: getRatingBorderColor(item) !== 'transparent' ? 3 : 0
+        }
+      ]}>
         <TouchableOpacity 
           style={[homeStyles.enhancedCard, styles.recentCard, { alignItems: 'center', height: 150 }]}
           activeOpacity={0.7}
@@ -1049,23 +1271,11 @@ function HomeScreen({
               </Text>
             </View>
             
-            {/* **🚀 ENHANCED RATING BUTTON - TEAM'S MASTERPIECE** */}
-            <EnhancedRatingButton
-              movie={item}
-              seen={seen}
-              onAddToSeen={onAddToSeen}
-              onUpdateRating={onUpdateRating}
-              colors={colors}
-              buttonStyles={buttonStyles}
-              modalStyles={modalStyles}
-              genres={genres}
-              mediaType={mediaType}
-            />
           </View>
         </TouchableOpacity>
       </View>
     );
-  }, [homeStyles, buttonStyles, formatReleaseDate, handleMovieSelect, seen, onAddToSeen, onUpdateRating, colors, modalStyles, genres, mediaType]);
+  }, [homeStyles, buttonStyles, formatReleaseDate, handleMovieSelect, seen, onAddToSeen, onUpdateRating, colors, modalStyles, genres, mediaType, getRatingBorderColor]);
 
   const renderAIRecommendationsSection = useCallback(() => {
     return (
@@ -1106,7 +1316,13 @@ function HomeScreen({
             snapToInterval={MOVIE_CARD_WIDTH + 12}
             decelerationRate="fast"
             renderItem={({ item, index }) => (
-              <View style={homeStyles.movieCardBorder}>
+              <View style={[
+                homeStyles.movieCardBorder,
+                { 
+                  borderColor: getRatingBorderColor(item),
+                  borderWidth: getRatingBorderColor(item) !== 'transparent' ? 3 : 0
+                }
+              ]}>
                 <TouchableOpacity
                   style={[{ marginRight: 12, width: MOVIE_CARD_WIDTH, height: MOVIE_CARD_WIDTH * 1.9 }]}
                   activeOpacity={0.7}
@@ -1148,18 +1364,6 @@ function HomeScreen({
                         </View>
                       </View>
 
-                      {/* **🚀 ENHANCED RATING BUTTON FOR AI RECOMMENDATIONS** */}
-                      <EnhancedRatingButton
-                        movie={item}
-                        seen={seen}
-                        onAddToSeen={onAddToSeen}
-                        onUpdateRating={onUpdateRating}
-                        colors={colors}
-                        buttonStyles={buttonStyles}
-                        modalStyles={modalStyles}
-                        genres={genres}
-                        mediaType={mediaType}
-                      />
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -1169,7 +1373,7 @@ function HomeScreen({
         )}
       </View>
     );
-  }, [aiRecommendations, isLoadingRecommendations, homeStyles, contentType, handleMovieSelect, colors, seen, onAddToSeen, onUpdateRating, buttonStyles, modalStyles, genres, mediaType]);
+  }, [aiRecommendations, isLoadingRecommendations, homeStyles, contentType, handleMovieSelect, colors, seen, onAddToSeen, onUpdateRating, buttonStyles, modalStyles, genres, mediaType, getRatingBorderColor]);
 
   const renderPopularMoviesSection = useCallback(() => {
     return (
@@ -1187,7 +1391,14 @@ function HomeScreen({
           snapToInterval={MOVIE_CARD_WIDTH + 12}
           decelerationRate="fast"
           renderItem={({ item, index }) => (
-            <View style={[homeStyles.movieCardBorder, { padding: 0 }]}>
+            <View style={[
+              homeStyles.movieCardBorder, 
+              { 
+                padding: 0,
+                borderColor: getRatingBorderColor(item),
+                borderWidth: getRatingBorderColor(item) !== 'transparent' ? 3 : 0
+              }
+            ]}>
               <TouchableOpacity
                 style={[{ marginRight: 12, width: MOVIE_CARD_WIDTH, height: MOVIE_CARD_WIDTH * 1.9 }]}
                 activeOpacity={0.7}
@@ -1241,18 +1452,6 @@ function HomeScreen({
                       </View>
                     )}
 
-                    {/* **🚀 ENHANCED RATING BUTTON FOR POPULAR MOVIES** */}
-                    <EnhancedRatingButton
-                      movie={item}
-                      seen={seen}
-                      onAddToSeen={onAddToSeen}
-                      onUpdateRating={onUpdateRating}
-                      colors={colors}
-                      buttonStyles={buttonStyles}
-                      modalStyles={modalStyles}
-                      genres={genres}
-                      mediaType={mediaType}
-                    />
                   </View>
                 </View>
               </TouchableOpacity>
@@ -1267,7 +1466,7 @@ function HomeScreen({
         />
       </View>
     );
-  }, [homeStyles, popularMovies, handleMovieSelect, popularScrollX, popularScrollRef, startPopularAutoScroll, autoScrollPopular, theme, mediaType, isDarkMode, colors, seen, onAddToSeen, onUpdateRating, buttonStyles, modalStyles, genres]);
+  }, [homeStyles, popularMovies, handleMovieSelect, popularScrollX, popularScrollRef, startPopularAutoScroll, autoScrollPopular, theme, mediaType, isDarkMode, colors, seen, onAddToSeen, onUpdateRating, buttonStyles, modalStyles, genres, getRatingBorderColor]);
 
   const renderWhatsOutNowSection = useCallback(() => {
     return (
@@ -1609,20 +1808,12 @@ function HomeScreen({
               </View>
               
               <View style={modalStyles.buttonRow}>
-                {/* **🚀 ENHANCED RATING BUTTON IN MODAL** */}
-                <View style={{ flex: 1, marginHorizontal: 4 }}>
-                  <EnhancedRatingButton
-                    movie={selectedMovie}
-                    seen={seen}
-                    onAddToSeen={onAddToSeen}
-                    onUpdateRating={onUpdateRating}
-                    colors={colors}
-                    buttonStyles={buttonStyles}
-                    modalStyles={modalStyles}
-                    genres={genres}
-                    mediaType={mediaType}
-                  />
-                </View>
+                <TouchableOpacity 
+                  style={[modalStyles.actionButton, { flex: 1, marginHorizontal: 4 }]}
+                  onPress={openRatingModal}
+                >
+                  <Text style={modalStyles.actionButtonText}>Rate</Text>
+                </TouchableOpacity>
                 
                 <TouchableOpacity 
                   style={[modalStyles.actionButton, { flex: 1, marginHorizontal: 4 }]}
@@ -1643,6 +1834,177 @@ function HomeScreen({
               
               <TouchableOpacity onPress={closeDetailModal} style={modalStyles.cancelButtonContainer}>
                 <Text style={modalStyles.cancelText}>cancel</Text>
+              </TouchableOpacity>
+            </LinearGradient>
+          </View>
+        </Modal>
+
+        {/* **ENHANCED SENTIMENT SELECTION MODAL** */}
+        <Modal visible={sentimentModalVisible} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.sentimentModalContent, { backgroundColor: colors.card }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                How did you feel about
+              </Text>
+              <Text style={[styles.movieTitle, { color: colors.accent }]}>
+                {selectedMovie?.title || selectedMovie?.name}?
+              </Text>
+              
+              <View style={styles.sentimentGrid}>
+                {Object.entries(calculateDynamicRatingCategories(seen)).map(([categoryKey, category]) => (
+                  <TouchableOpacity
+                    key={categoryKey}
+                    style={[
+                      styles.sentimentButton,
+                      { 
+                        backgroundColor: 'transparent',
+                        borderColor: category.borderColor || category.color,
+                        borderWidth: 3
+                      }
+                    ]}
+                    onPress={() => handleSentimentSelect(categoryKey)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.sentimentEmoji}>{category.emoji}</Text>
+                    <Text style={[styles.sentimentLabel, { color: category.color }]}>
+                      {category.label}
+                    </Text>
+                    <Text style={[styles.sentimentDescription, { color: colors.subText }]}>
+                      {category.description}
+                    </Text>
+                    <Text style={[styles.sentimentRange, { color: colors.subText }]}>
+                      {category.range[0].toFixed(1)} - {category.range[1].toFixed(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              
+              <TouchableOpacity 
+                style={[styles.cancelButton, { borderColor: colors.border?.color || '#ccc' }]}
+                onPress={handleCloseEnhancedModals}
+              >
+                <Text style={[styles.cancelButtonText, { color: colors.subText }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* **WILDCARD COMPARISON MODAL** */}
+        <Modal visible={comparisonModalVisible} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <LinearGradient
+              colors={colors.primaryGradient || ['#667eea', '#764ba2']}
+              style={[styles.comparisonModalContent]}
+            >
+              {!isComparisonComplete ? (
+                <>
+                  <View style={styles.comparisonHeader}>
+                    <Text style={[styles.modalTitle, { color: colors.text }]}>
+                      🎬 Comparison {currentComparison + 1}/3
+                    </Text>
+                    <Text style={[styles.comparisonSubtitle, { color: colors.subText }]}>
+                      Which one do you prefer?
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.moviesComparison}>
+                    {/* New Movie */}
+                    <TouchableOpacity 
+                      style={styles.movieComparisonCard}
+                      onPress={() => handleComparison('new')}
+                      activeOpacity={0.8}
+                    >
+                      <Image
+                        source={{ uri: `https://image.tmdb.org/t/p/w500${selectedMovie?.poster_path}` }}
+                        style={styles.comparisonPoster}
+                        resizeMode="cover"
+                      />
+                      <Text style={[styles.movieCardName, { color: colors.text }]} numberOfLines={2}>
+                        {selectedMovie?.title || selectedMovie?.name}
+                      </Text>
+                      <Text style={[styles.movieCardYear, { color: colors.subText }]}>
+                        {selectedMovie?.release_date ? new Date(selectedMovie.release_date).getFullYear() : 'N/A'}
+                      </Text>
+                    </TouchableOpacity>
+                    
+                    {/* VS Indicator */}
+                    <View style={styles.vsIndicator}>
+                      <Text style={[styles.vsText, { color: colors.accent }]}>VS</Text>
+                    </View>
+                    
+                    {/* Comparison Movie */}
+                    {comparisonMovies[currentComparison] && (
+                      <TouchableOpacity 
+                        style={styles.movieComparisonCard}
+                        onPress={() => handleComparison('comparison')}
+                        activeOpacity={0.8}
+                      >
+                        <Image
+                          source={{ uri: `https://image.tmdb.org/t/p/w500${comparisonMovies[currentComparison]?.poster_path}` }}
+                          style={styles.comparisonPoster}
+                          resizeMode="cover"
+                        />
+                        <Text style={[styles.movieCardName, { color: colors.text }]} numberOfLines={2}>
+                          {comparisonMovies[currentComparison]?.title || comparisonMovies[currentComparison]?.name}
+                        </Text>
+                        <Text style={[styles.movieCardYear, { color: colors.subText }]}>
+                          {comparisonMovies[currentComparison]?.release_date ? new Date(comparisonMovies[currentComparison].release_date).getFullYear() : 'N/A'}
+                        </Text>
+                        <View style={[styles.ratingBadge, { backgroundColor: colors.accent }]}>
+                          <Text style={styles.ratingText}>
+                            {comparisonMovies[currentComparison]?.userRating?.toFixed(1)}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {/* Progress Indicator */}
+                  <View style={styles.progressIndicator}>
+                    {[0, 1, 2].map(index => (
+                      <View
+                        key={index}
+                        style={[
+                          styles.progressDot,
+                          { 
+                            backgroundColor: index <= currentComparison ? colors.accent : colors.border?.color || '#ccc'
+                          }
+                        ]}
+                      />
+                    ))}
+                  </View>
+                </>
+              ) : (
+                // Completion Screen
+                <View style={styles.completionScreen}>
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>
+                    🎯 Rating Complete!
+                  </Text>
+                  <Text style={[styles.comparisonSubtitle, { color: colors.subText }]}>
+                    Based on your {comparisonResults.filter(r => r.userChoice === 'new').length}/3 comparisons
+                  </Text>
+                  
+                  <View style={styles.resultsContainer}>
+                    {comparisonResults.map((result, index) => (
+                      <View key={index} style={styles.resultRow}>
+                        <Text style={[styles.resultText, { color: colors.text }]}>
+                          {result.comparison}. vs {result.loser.title}: {result.userChoice === 'new' ? '✅ Won' : '❌ Lost'}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+              
+              <TouchableOpacity 
+                style={[styles.cancelButton, { borderColor: colors.border?.color || '#ccc' }]}
+                onPress={handleCloseEnhancedModals}
+              >
+                <Text style={[styles.cancelButtonText, { color: colors.subText }]}>
+                  {isComparisonComplete ? 'Close' : 'Cancel'}
+                </Text>
               </TouchableOpacity>
             </LinearGradient>
           </View>
@@ -1772,6 +2134,164 @@ const styles = StyleSheet.create({
     zIndex: 1,
     minWidth: 24,
     alignItems: 'center',
+  },
+
+  // **Enhanced Rating System Modal Styles**
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sentimentModalContent: {
+    width: '90%',
+    maxWidth: 400,
+    padding: 24,
+    borderRadius: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  movieTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  sentimentGrid: {
+    gap: 16,
+    marginBottom: 24,
+  },
+  sentimentButton: {
+    padding: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sentimentEmoji: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  sentimentLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  sentimentDescription: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  sentimentRange: {
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
+  comparisonModalContent: {
+    width: '95%',
+    maxWidth: 500,
+    padding: 20,
+    borderRadius: 16,
+    maxHeight: '80%',
+  },
+  comparisonHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  comparisonSubtitle: {
+    fontSize: 14,
+    marginTop: 4,
+  },
+  moviesComparison: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  movieComparisonCard: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginHorizontal: 8,
+  },
+  comparisonPoster: {
+    width: 120,
+    height: 180,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  movieCardName: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  movieCardYear: {
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  ratingBadge: {
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+  },
+  ratingText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  vsIndicator: {
+    marginHorizontal: 16,
+    paddingVertical: 8,
+  },
+  vsText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  progressIndicator: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  progressDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginHorizontal: 4,
+  },
+  completionScreen: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  resultsContainer: {
+    marginTop: 20,
+    width: '100%',
+  },
+  resultRow: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginVertical: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+  },
+  resultText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  cancelButton: {
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

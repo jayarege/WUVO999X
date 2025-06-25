@@ -11,10 +11,10 @@ const calculateDynamicRatingCategories = (userMovies) => {
   if (!userMovies || userMovies.length === 0) {
     // Fallback to default ranges if no user data
     return {
-      LOVED: { range: [8.5, 10], percentile: [75, 100], emoji: '❤️', color: '#4CAF50', label: 'Loved it!', description: 'This was amazing!' },
-      LIKED: { range: [6.5, 8.4], percentile: [50, 74], emoji: '👍', color: '#4CAF50', label: 'Liked it', description: 'Pretty good!' },
-      AVERAGE: { range: [4.5, 6.4], percentile: [25, 49], emoji: '🟡', color: '#FF9800', label: 'It was okay', description: 'Nothing special' },
-      DISLIKED: { range: [1, 4.4], percentile: [0, 24], emoji: '👎', color: '#F44336', label: 'Disliked it', description: 'Not for me' }
+      LOVED: { range: [8.5, 10], percentile: [75, 100], emoji: '❤️', color: '#4CAF50', borderColor: '#1B5E20', label: 'Loved it!', description: 'This was amazing!' },
+      LIKED: { range: [6.5, 8.4], percentile: [50, 74], emoji: '👍', color: '#4CAF50', borderColor: '#4CAF50', label: 'Liked it', description: 'Pretty good!' },
+      AVERAGE: { range: [4.5, 6.4], percentile: [25, 49], emoji: '🟡', color: '#FF9800', borderColor: '#FFC107', label: 'It was okay', description: 'Nothing special' },
+      DISLIKED: { range: [1, 4.4], percentile: [0, 24], emoji: '👎', color: '#F44336', borderColor: '#D32F2F', label: 'Disliked it', description: 'Not for me' }
     };
   }
 
@@ -47,6 +47,7 @@ const calculateDynamicRatingCategories = (userMovies) => {
       percentile: [75, 100], 
       emoji: '❤️', 
       color: '#4CAF50',
+      borderColor: '#1B5E20', // Dark green border
       label: 'Loved it!',
       description: 'This was amazing!'
     },
@@ -55,6 +56,7 @@ const calculateDynamicRatingCategories = (userMovies) => {
       percentile: [50, 74], 
       emoji: '👍', 
       color: '#4CAF50',
+      borderColor: '#4CAF50', // Light green border
       label: 'Liked it',
       description: 'Pretty good!'
     },
@@ -63,6 +65,7 @@ const calculateDynamicRatingCategories = (userMovies) => {
       percentile: [25, 49], 
       emoji: '🟡', 
       color: '#FF9800',
+      borderColor: '#FFC107', // Yellow border
       label: 'It was okay',
       description: 'Nothing special'
     },
@@ -71,6 +74,7 @@ const calculateDynamicRatingCategories = (userMovies) => {
       percentile: [0, 24], 
       emoji: '👎', 
       color: '#F44336',
+      borderColor: '#D32F2F', // Red border
       label: 'Disliked it',
       description: 'Not for me'
     }
@@ -368,8 +372,8 @@ const SentimentRatingModal = ({ visible, movie, onClose, onRatingSelect, colors,
           styles.sentimentButton,
           { 
             backgroundColor: isSelected ? category.color : 'transparent',
-            borderColor: category.color,
-            borderWidth: 2
+            borderColor: category.borderColor || category.color,
+            borderWidth: 3
           }
         ]}
         onPress={() => handleCategorySelect(categoryKey)}
@@ -435,8 +439,13 @@ const EnhancedRatingButton = ({
   onUpdateRating,
   colors,
   buttonStyles,
+  modalStyles,
   genres,
-  mediaType 
+  mediaType,
+  size = 'medium', // 'small', 'medium', 'large'
+  variant = 'default', // 'default', 'compact', 'icon-only'
+  onSuccess, // Callback when rating is completed
+  showRatingValue = false // Show current rating on button
 }) => {
   console.log('🎬 EnhancedRatingButton rendering for:', movie?.title);
   
@@ -448,6 +457,11 @@ const EnhancedRatingButton = ({
 
   const isAlreadyRated = useMemo(() => {
     return seen?.some(item => item.id === movie?.id) || false;
+  }, [seen, movie?.id]);
+
+  const currentRating = useMemo(() => {
+    const ratedMovie = seen?.find(item => item.id === movie?.id);
+    return ratedMovie?.userRating || null;
   }, [seen, movie?.id]);
 
   const handleRateButtonPress = useCallback(() => {
@@ -525,6 +539,11 @@ const EnhancedRatingButton = ({
     setSuggestedRating(null);
     setComparisonMovies([]);
     
+    // Call success callback if provided
+    if (onSuccess) {
+      onSuccess(finalRating, movie);
+    }
+    
     const RATING_CATEGORIES = calculateDynamicRatingCategories(seen);
     
     Alert.alert(
@@ -550,32 +569,103 @@ const EnhancedRatingButton = ({
     setComparisonMovies([]);
   }, []);
 
+  // Dynamic button styles based on size and variant
+  const getButtonStyles = () => {
+    const baseStyle = {
+      flexDirection: variant === 'icon-only' ? 'column' : 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: size === 'small' ? 6 : size === 'large' ? 12 : 8,
+      borderWidth: 1,
+      borderColor: colors.accent,
+      backgroundColor: isAlreadyRated ? (colors.secondary || colors.primary) : colors.primary,
+    };
+
+    // Size-based padding
+    if (size === 'small') {
+      baseStyle.paddingVertical = 4;
+      baseStyle.paddingHorizontal = variant === 'icon-only' ? 6 : 8;
+    } else if (size === 'large') {
+      baseStyle.paddingVertical = 12;
+      baseStyle.paddingHorizontal = variant === 'icon-only' ? 16 : 20;
+    } else {
+      baseStyle.paddingVertical = 8;
+      baseStyle.paddingHorizontal = variant === 'icon-only' ? 12 : 16;
+    }
+
+    // Variant-based adjustments
+    if (variant === 'compact') {
+      baseStyle.paddingVertical = Math.max(4, baseStyle.paddingVertical - 2);
+      baseStyle.paddingHorizontal = Math.max(6, baseStyle.paddingHorizontal - 2);
+    }
+
+    return baseStyle;
+  };
+
+  const getIconSize = () => {
+    if (size === 'small') return 12;
+    if (size === 'large') return 20;
+    return 16;
+  };
+
+  const getTextSize = () => {
+    if (size === 'small') return 12;
+    if (size === 'large') return 16;
+    return 14;
+  };
+
+  const getButtonText = () => {
+    if (variant === 'icon-only') return '';
+    if (isAlreadyRated) {
+      if (showRatingValue && currentRating) {
+        return variant === 'compact' ? `${currentRating.toFixed(1)}★` : `${currentRating.toFixed(1)}/10`;
+      }
+      return variant === 'compact' ? 'Edit' : 'Update Rating';
+    }
+    return variant === 'compact' ? 'Rate' : 'Rate';
+  };
+
   return (
     <>
       <TouchableOpacity
         style={[
           buttonStyles?.primaryButton || styles.defaultButton,
           styles.enhancedRateButton,
-          { 
-            backgroundColor: isAlreadyRated ? colors.secondary : colors.primary,
-            borderColor: colors.accent
-          }
+          getButtonStyles()
         ]}
         onPress={handleRateButtonPress}
         activeOpacity={0.8}
       >
         <Ionicons 
           name={isAlreadyRated ? "star" : "star-outline"} 
-          size={16} 
+          size={getIconSize()} 
           color={colors.accent} 
         />
-        <Text style={[
-          buttonStyles?.primaryButtonText || styles.defaultButtonText,
-          styles.enhancedRateButtonText,
-          { color: colors.accent }
-        ]}>
-          {isAlreadyRated ? 'Update Rating' : 'Rate'}
-        </Text>
+        {variant !== 'icon-only' && (
+          <Text style={[
+            buttonStyles?.primaryButtonText || styles.defaultButtonText,
+            styles.enhancedRateButtonText,
+            { 
+              color: colors.accent,
+              fontSize: getTextSize(),
+              marginLeft: variant === 'compact' ? 4 : 6,
+              marginTop: 0
+            }
+          ]}>
+            {getButtonText()}
+          </Text>
+        )}
+        {variant === 'icon-only' && showRatingValue && currentRating && (
+          <Text style={[
+            styles.iconOnlyRatingText,
+            { 
+              color: colors.accent,
+              fontSize: size === 'small' ? 8 : size === 'large' ? 12 : 10
+            }
+          ]}>
+            {currentRating.toFixed(1)}
+          </Text>
+        )}
       </TouchableOpacity>
 
       <SentimentRatingModal
@@ -618,6 +708,11 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     fontSize: 14,
     fontWeight: '600',
+  },
+  iconOnlyRatingText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    marginTop: 2,
   },
   defaultButton: {
     backgroundColor: '#007AFF',
@@ -836,4 +931,67 @@ const styles = StyleSheet.create({
   },
 });
 
-export { EnhancedRatingButton };
+// Quick Rating Button for Home Screen Cards
+const QuickRatingButton = ({ 
+  movie, 
+  seen, 
+  onAddToSeen, 
+  onUpdateRating,
+  colors,
+  onSuccess
+}) => {
+  return (
+    <EnhancedRatingButton
+      movie={movie}
+      seen={seen}
+      onAddToSeen={onAddToSeen}
+      onUpdateRating={onUpdateRating}
+      colors={colors}
+      size="small"
+      variant="icon-only"
+      showRatingValue={true}
+      onSuccess={onSuccess}
+    />
+  );
+};
+
+// Compact Rating Button for Lists
+const CompactRatingButton = ({ 
+  movie, 
+  seen, 
+  onAddToSeen, 
+  onUpdateRating,
+  colors,
+  onSuccess
+}) => {
+  return (
+    <EnhancedRatingButton
+      movie={movie}
+      seen={seen}
+      onAddToSeen={onAddToSeen}
+      onUpdateRating={onUpdateRating}
+      colors={colors}
+      size="small"
+      variant="compact"
+      showRatingValue={true}
+      onSuccess={onSuccess}
+    />
+  );
+};
+
+// Helper function to get rating category for a movie
+const getRatingCategory = (rating, userMovies) => {
+  if (!rating) return null;
+  
+  const categories = calculateDynamicRatingCategories(userMovies);
+  
+  for (const [key, category] of Object.entries(categories)) {
+    if (rating >= category.range[0] && rating <= category.range[1]) {
+      return { key, ...category };
+    }
+  }
+  
+  return null;
+};
+
+export { EnhancedRatingButton, QuickRatingButton, CompactRatingButton, getRatingCategory, calculateDynamicRatingCategories };
