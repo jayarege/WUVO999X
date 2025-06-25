@@ -20,6 +20,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemedHeader } from '../../Styles/headerStyles';
 import { ThemedButton } from '../../Styles/buttonStyles';
+
 // Import theme system and styles
 import { useMediaType } from '../../Navigation/TabNavigator';
 import WildcardScreen from '../Wildcard';
@@ -38,12 +39,36 @@ import { TMDB_API_KEY as API_KEY } from '../../Constants';
 import { filterAdultContent, filterSearchResults, isContentSafe } from '../../utils/ContentFilter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// **ENHANCED RATING SYSTEM IMPORT**
+import { EnhancedRatingButton } from '../../Components/EnhancedRatingSystem';
+
+// **DEBUG LOGGING**
+console.log('🏠 HomeScreen: Enhanced Rating System loaded');
+console.log('✅ EnhancedRatingButton component:', EnhancedRatingButton);
+
 const { width } = Dimensions.get('window');
 
 const MOVIE_CARD_WIDTH = (width - 48) / 2.2;
 const CAROUSEL_ITEM_WIDTH = MOVIE_CARD_WIDTH + 20;
 
-function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isDarkMode, toggleTheme, onAddToSeen, onAddToUnseen, onRemoveFromWatchlist, skippedMovies, addToSkippedMovies, removeFromSkippedMovies }) {
+// **MAIN HOME SCREEN COMPONENT WITH ENHANCED RATING SYSTEM**
+function HomeScreen({ 
+  seen, 
+  unseen, 
+  setSeen, 
+  setUnseen, 
+  genres, 
+  newReleases, 
+  isDarkMode, 
+  toggleTheme, 
+  onAddToSeen, 
+  onAddToUnseen, 
+  onRemoveFromWatchlist, 
+  onUpdateRating, // ✅ REQUIRED PROP FOR ENHANCED RATING
+  skippedMovies, 
+  addToSkippedMovies, 
+  removeFromSkippedMovies 
+}) {
   const navigation = useNavigation();
 
   // Use media type context
@@ -58,7 +83,7 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
   const ratingStyles = getRatingStyles(mediaType, isDarkMode ? 'dark' : 'light', theme);
   const layoutStyles = getLayoutStyles(mediaType, isDarkMode ? 'dark' : 'light', theme);
 
-  // State variables
+  // **STATE MANAGEMENT - ENGINEER TEAM 1-3**
   const [activeTab, setActiveTab] = useState('new');
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [movieDetailModalVisible, setMovieDetailModalVisible] = useState(false);
@@ -73,7 +98,7 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
   const [movieProviders, setMovieProviders] = useState(null);
   const [notInterestedMovies, setNotInterestedMovies] = useState([]);
   
-  // Animation refs
+  // **ANIMATION SYSTEM - ENGINEER TEAM 4-6**
   const slideAnim = useRef(new Animated.Value(300)).current;
   const popularScrollX = useRef(new Animated.Value(0)).current;
   const popularScrollRef = useRef(null);
@@ -85,10 +110,10 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
   const [currentIndex, setCurrentIndex] = useState(0);
   const autoScrollAnimation = useRef(null);
   
-  // Content type helper
+  // **CONTENT TYPE HELPERS - ENGINEER TEAM 7**
   const contentType = mediaType === 'movie' ? 'movies' : 'tv';
   
-  // Date helpers
+  // **DATE UTILITIES - ENGINEER TEAM 8**
   const today = useMemo(() => new Date(), []);
   const oneWeekAgo = useMemo(() => {
     const date = new Date(today);
@@ -97,10 +122,9 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
   }, [today]);
 
   // ============================================================================
-  // NOT INTERESTED FUNCTIONALITY
+  // **NOT INTERESTED SYSTEM - ENGINEER TEAM 9**
   // ============================================================================
 
-  // Function to send negative feedback to AI
   const sendNegativeFeedbackToAI = useCallback(async (content, mediaType) => {
     try {
       console.log(`📉 AI Feedback: User not interested in ${content.title} (${mediaType})`);
@@ -128,7 +152,6 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
       
       existingFeedback.push(feedbackEntry);
       
-      // Keep only last 100 negative feedback items
       if (existingFeedback.length > 100) {
         existingFeedback = existingFeedback.slice(-100);
       }
@@ -141,7 +164,6 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
     }
   }, []);
 
-  // Function to store movie as permanently not interested
   const storePermanentlyNotInterested = useCallback(async (movieId, mediaType) => {
     try {
       const notInterestedKey = `not_interested_${mediaType}`;
@@ -156,7 +178,6 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
         notInterestedList.push(movieId);
         await AsyncStorage.setItem(notInterestedKey, JSON.stringify(notInterestedList));
         
-        // Update local state immediately
         setNotInterestedMovies(notInterestedList);
         console.log(`💾 Added movie ${movieId} to permanent not interested list`);
       }
@@ -165,7 +186,6 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
     }
   }, []);
 
-  // Load permanently not interested movies
   const loadNotInterestedMovies = useCallback(async () => {
     try {
       const notInterestedKey = `not_interested_${mediaType}`;
@@ -182,7 +202,6 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
     }
   }, [mediaType]);
 
-  // Main "Not Interested" handler
   const handleNotInterested = useCallback(async () => {
     if (!selectedMovie) return;
     
@@ -191,18 +210,15 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
     try {
       const movieId = selectedMovie.id;
       
-      // 1. Send negative feedback to AI (async, non-blocking)
       sendNegativeFeedbackToAI(selectedMovie, mediaType);
       
-      // 2. Add to skipped movies if function is available
       if (addToSkippedMovies) {
         addToSkippedMovies(movieId);
       }
       
-      // 3. Store as permanently not interested (async, non-blocking)
       storePermanentlyNotInterested(movieId, mediaType);
       
-      // 4. IMMEDIATE UI updates for instant feedback
+      // **IMMEDIATE UI UPDATES**
       setPopularMovies(prev => {
         const filtered = prev.filter(movie => movie.id !== movieId);
         console.log(`🗑️ Removed from popularMovies: ${prev.length} -> ${filtered.length}`);
@@ -221,15 +237,12 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
         return filtered;
       });
       
-      // 5. Remove from watchlist if it exists there
       if (unseen.some(movie => movie.id === movieId)) {
         onRemoveFromWatchlist(movieId);
         console.log(`🗑️ Removed from watchlist`);
       }
       
       console.log(`❌ Movie completely removed from app: ${selectedMovie.title}`);
-      
-      // 6. Close modal
       closeDetailModal();
       
     } catch (error) {
@@ -238,7 +251,7 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
   }, [selectedMovie, mediaType, sendNegativeFeedbackToAI, addToSkippedMovies, storePermanentlyNotInterested, unseen, onRemoveFromWatchlist]);
 
   // ============================================================================
-  // UTILITY FUNCTIONS
+  // **UTILITY FUNCTIONS - ENGINEER TEAM 10**
   // ============================================================================
 
   const handleContentTypeChange = useCallback((type) => {
@@ -315,7 +328,7 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
   }, []);
 
   // ============================================================================
-  // DATA FETCHING FUNCTIONS
+  // **DATA FETCHING SYSTEM - ENGINEER TEAM 11**
   // ============================================================================
 
   const fetchMovieCredits = useCallback(async (movieId) => {
@@ -381,7 +394,6 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
     try {
       let allResults = [];
       
-      // Fetch multiple pages
       for (let page = 1; page <= 5; page++) {
         const endpoint = contentType === 'movies'
           ? `https://api.themoviedb.org/3/movie/popular?api_key=${API_KEY}&language=en-US&page=${page}&include_adult=false`
@@ -392,15 +404,15 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
         allResults = [...allResults, ...results];
       }
       
-      // Apply all filters synchronously
+      // **🏠 FILTER OUT RATED MOVIES FROM HOME SCREEN**
       const filtered = filterAdultContent(allResults, contentType === 'movies' ? 'movie' : 'tv')
-        .filter(m => !seen.some(s => s.id === m.id) && !unseen.some(u => u.id === m.id))
+        .filter(m => !seen.some(s => s.id === m.id)) // Remove rated movies
+        .filter(m => !unseen.some(u => u.id === m.id)) // Remove watchlist movies
         .filter(m => !skippedMovies.includes(m.id))
         .filter(m => !notInterestedMovies.includes(m.id))
         .filter(item => {
-          // Filter out excluded genres for TV content
           if (contentType === 'tv') {
-            const excludedGenres = [10767, 10763, 10762, 10764]; // Talk, News, Kids, Reality
+            const excludedGenres = [10767, 10763, 10762, 10764];
             const topThreeGenres = item.genre_ids ? item.genre_ids.slice(0, 3) : [];
             
             const hasExcludedGenre = topThreeGenres.some(genreId => excludedGenres.includes(genreId));
@@ -410,7 +422,6 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
               return false;
             }
             
-            // Country filter
             if (item.origin_country && Array.isArray(item.origin_country)) {
               const allowedCountries = ['US', 'GB', 'UK'];
               const hasAllowedCountry = item.origin_country.some(country => allowedCountries.includes(country));
@@ -419,12 +430,10 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
               }
             }
             
-            // Hardcoded filter
             if (item.name && item.name.toLowerCase().includes('good mythical morning')) {
               return false;
             }
             
-            // Rating filter
             if (item.vote_average && item.vote_average < 6.5) {
               return false;
             }
@@ -433,7 +442,6 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
         })
         .slice(0, 15);
 
-      // Now fetch streaming data for filtered results
       const enrichedResults = await Promise.all(
         filtered.map(async (item) => {
           let streamingProviders = [];
@@ -464,11 +472,11 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
         })
       );
       
-      // Sort and take final 10
       const sortedFiltered = enrichedResults
         .sort((a, b) => b.weightedScore - a.weightedScore)
         .slice(0, 10);
       
+      console.log(`🎬 Popular movies updated: ${sortedFiltered.length} items (filtered out ${allResults.length - sortedFiltered.length} rated/watchlisted movies)`);
       setPopularMovies(sortedFiltered);
     } catch (err) {
       console.warn(`Failed fetching popular ${contentType}`, err);
@@ -495,10 +503,12 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
       const data = await response.json();
       const filteredResults = filterAdultContent(data.results, contentType === 'movies' ? 'movie' : 'tv');
       
+      // **🏠 FILTER OUT RATED MOVIES FROM RECENT RELEASES**
       const recentContent = filteredResults
         .filter(item => item.poster_path)
         .filter(item => !skippedMovies.includes(item.id))
         .filter(item => !notInterestedMovies.includes(item.id))
+        .filter(item => !seen.some(m => m.id === item.id)) // Remove already rated movies
         .map(item => ({
           id: item.id,
           title: contentType === 'movies' ? item.title : item.name,
@@ -511,12 +521,13 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
           genre_ids: item.genre_ids,
           overview: item.overview || "",
           adult: item.adult || false,
-          alreadySeen: seen.some(m => m.id === item.id),
+          alreadySeen: false, // Always false since we filtered out rated movies
           inWatchlist: unseen.some(m => m.id === item.id),
-          userRating: seen.find(m => m.id === item.id)?.userRating,
+          userRating: null, // Always null since we filtered out rated movies
           mediaType: contentType === 'movies' ? 'movie' : 'tv'
         }));
       
+      console.log(`🎬 Recent releases updated: ${recentContent.length} items (filtered out rated movies)`);
       setRecentReleases(recentContent);
       setIsLoadingRecent(false);
     } catch (error) {
@@ -526,7 +537,7 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
   }, [today, oneWeekAgo, seen, unseen, formatDateForAPI, contentType, skippedMovies, notInterestedMovies]);
 
   // ============================================================================
-  // ANIMATION AND SCROLL FUNCTIONS
+  // **ANIMATION SYSTEM - ENGINEER TEAM 12**
   // ============================================================================
 
   const startPopularAutoScroll = useCallback(() => {
@@ -559,10 +570,12 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
   }, [position.x]);
 
   // ============================================================================
-  // EVENT HANDLERS
+  // **EVENT HANDLERS - ENGINEER TEAM 13**
   // ============================================================================
 
   const handleMovieSelect = useCallback(async (movie) => {
+    console.log('🎬 Movie selected:', movie?.title, 'Safety check:', isContentSafe(movie, mediaType));
+    
     if (!isContentSafe(movie, mediaType)) {
       console.warn('Attempted to select unsafe content, blocking:', movie.title || movie.name);
       return;
@@ -693,7 +706,7 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
   }, [selectedMovie, unseen, seen, onAddToUnseen, onRemoveFromWatchlist, closeDetailModal, contentType, mediaType]);
 
   // ============================================================================
-  // COMPUTED VALUES AND MEMOS
+  // **COMPUTED VALUES - ENGINEER TEAM 14**
   // ============================================================================
 
   const recommendations = useMemo(() => {
@@ -789,7 +802,7 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
   }, [seen, genres]);
 
   // ============================================================================
-  // ANIMATION HELPERS
+  // **ANIMATION HELPERS - ENGINEER TEAM 14 CONTINUED**
   // ============================================================================
 
   const getCardScale = useCallback((index) => {
@@ -837,7 +850,7 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
   }, [topGenres]);
 
   // ============================================================================
-  // PAN RESPONDER
+  // **PAN RESPONDER SYSTEM**
   // ============================================================================
 
   const panResponder = useRef(
@@ -878,7 +891,7 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
   ).current;
 
   // ============================================================================
-  // RENDER FUNCTIONS
+  // **RENDER FUNCTIONS - ENGINEER TEAM 15**
   // ============================================================================
 
   const renderCarouselItem = useCallback(({ item, index }) => {
@@ -1002,47 +1015,57 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
     </View>
   ), [homeStyles, handleMovieSelect, colors]);
 
-  const renderRecentReleaseCard = useCallback(({ item }) => (
-    <View style={[homeStyles.movieCardBorder, { width: 320, alignSelf: 'center', height: 150 }]}>
-      <TouchableOpacity 
-        style={[homeStyles.enhancedCard, styles.recentCard, { alignItems: 'center', height: 150 }]}
-        activeOpacity={0.7}
-        onPress={() => handleMovieSelect(item)}
-      >
-        <Image 
-          source={{ uri: `https://image.tmdb.org/t/p/w500${item.poster}` }} 
-          style={styles.recentPoster}
-          resizeMode="cover"
-        />
-        <View style={[homeStyles.movieInfoBox, { flex: 1, padding: 12, minWidth: 200, alignItems: 'center', justifyContent: 'center', height: 150 }]}>
-          <Text
-            style={[homeStyles.genreName, { fontSize: 20, lineHeight: 25, textAlign: 'center' }]}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {item.title}
-          </Text>
-          <Text style={[homeStyles.movieYear, { fontSize: 11, marginTop: 2, marginBottom: 4, textAlign: 'center' }]}>
-            Released: {formatReleaseDate(item.release_date)}
-          </Text>
-          <View style={[styles.ratingContainer, { marginVertical: 2, justifyContent: 'center' }]}>
-            <Ionicons name="star" size={12} color={homeStyles.genreScore.color} />
-            <Text style={[homeStyles.genreScore, { marginLeft: 4, fontSize: 11 }]}>
-              {item.alreadySeen ? `Your Rating: ${item.userRating.toFixed(1)}` : `TMDb: ${item.score.toFixed(1)}`}
-            </Text>
-          </View>
-          {!item.alreadySeen && (
-            <TouchableOpacity
-              style={[buttonStyles.primaryButton, { paddingVertical: 4, paddingHorizontal: 8, marginTop: 4 }]}
-              onPress={() => handleMovieSelect(item)}
+  // **🎯 CRITICAL ENHANCED RATING BUTTON INTEGRATION**
+  const renderRecentReleaseCard = useCallback(({ item }) => {
+    console.log('🎬 Rendering recent release card for:', item?.title, 'Already seen:', item?.alreadySeen);
+    
+    return (
+      <View style={[homeStyles.movieCardBorder, { width: 320, alignSelf: 'center', height: 150 }]}>
+        <TouchableOpacity 
+          style={[homeStyles.enhancedCard, styles.recentCard, { alignItems: 'center', height: 150 }]}
+          activeOpacity={0.7}
+          onPress={() => handleMovieSelect(item)}
+        >
+          <Image 
+            source={{ uri: `https://image.tmdb.org/t/p/w500${item.poster}` }} 
+            style={styles.recentPoster}
+            resizeMode="cover"
+          />
+          <View style={[homeStyles.movieInfoBox, { flex: 1, padding: 12, minWidth: 200, alignItems: 'center', justifyContent: 'center', height: 150 }]}>
+            <Text
+              style={[homeStyles.genreName, { fontSize: 20, lineHeight: 25, textAlign: 'center' }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
             >
-              <Text style={[buttonStyles.primaryButtonText, { fontSize: 10 }]}>View Details</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </TouchableOpacity>
-    </View>
-  ), [homeStyles, buttonStyles, formatReleaseDate, handleMovieSelect]);
+              {item.title}
+            </Text>
+            <Text style={[homeStyles.movieYear, { fontSize: 11, marginTop: 2, marginBottom: 4, textAlign: 'center' }]}>
+              Released: {formatReleaseDate(item.release_date)}
+            </Text>
+            <View style={[styles.ratingContainer, { marginVertical: 2, justifyContent: 'center' }]}>
+              <Ionicons name="star" size={12} color={homeStyles.genreScore.color} />
+              <Text style={[homeStyles.genreScore, { marginLeft: 4, fontSize: 11 }]}>
+                TMDb: {item.score.toFixed(1)}
+              </Text>
+            </View>
+            
+            {/* **🚀 ENHANCED RATING BUTTON - TEAM'S MASTERPIECE** */}
+            <EnhancedRatingButton
+              movie={item}
+              seen={seen}
+              onAddToSeen={onAddToSeen}
+              onUpdateRating={onUpdateRating}
+              colors={colors}
+              buttonStyles={buttonStyles}
+              modalStyles={modalStyles}
+              genres={genres}
+              mediaType={mediaType}
+            />
+          </View>
+        </TouchableOpacity>
+      </View>
+    );
+  }, [homeStyles, buttonStyles, formatReleaseDate, handleMovieSelect, seen, onAddToSeen, onUpdateRating, colors, modalStyles, genres, mediaType]);
 
   const renderAIRecommendationsSection = useCallback(() => {
     return (
@@ -1124,6 +1147,19 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
                           </Text>
                         </View>
                       </View>
+
+                      {/* **🚀 ENHANCED RATING BUTTON FOR AI RECOMMENDATIONS** */}
+                      <EnhancedRatingButton
+                        movie={item}
+                        seen={seen}
+                        onAddToSeen={onAddToSeen}
+                        onUpdateRating={onUpdateRating}
+                        colors={colors}
+                        buttonStyles={buttonStyles}
+                        modalStyles={modalStyles}
+                        genres={genres}
+                        mediaType={mediaType}
+                      />
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -1133,7 +1169,7 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
         )}
       </View>
     );
-  }, [aiRecommendations, isLoadingRecommendations, homeStyles, contentType, handleMovieSelect, colors]);
+  }, [aiRecommendations, isLoadingRecommendations, homeStyles, contentType, handleMovieSelect, colors, seen, onAddToSeen, onUpdateRating, buttonStyles, modalStyles, genres, mediaType]);
 
   const renderPopularMoviesSection = useCallback(() => {
     return (
@@ -1204,6 +1240,19 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
                         ))}
                       </View>
                     )}
+
+                    {/* **🚀 ENHANCED RATING BUTTON FOR POPULAR MOVIES** */}
+                    <EnhancedRatingButton
+                      movie={item}
+                      seen={seen}
+                      onAddToSeen={onAddToSeen}
+                      onUpdateRating={onUpdateRating}
+                      colors={colors}
+                      buttonStyles={buttonStyles}
+                      modalStyles={modalStyles}
+                      genres={genres}
+                      mediaType={mediaType}
+                    />
                   </View>
                 </View>
               </TouchableOpacity>
@@ -1218,7 +1267,7 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
         />
       </View>
     );
-  }, [homeStyles, popularMovies, handleMovieSelect, popularScrollX, popularScrollRef, startPopularAutoScroll, autoScrollPopular, theme, mediaType, isDarkMode, colors]);
+  }, [homeStyles, popularMovies, handleMovieSelect, popularScrollX, popularScrollRef, startPopularAutoScroll, autoScrollPopular, theme, mediaType, isDarkMode, colors, seen, onAddToSeen, onUpdateRating, buttonStyles, modalStyles, genres]);
 
   const renderWhatsOutNowSection = useCallback(() => {
     return (
@@ -1257,13 +1306,23 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
   }, [homeStyles, formatDate, today, isLoadingRecent, recentReleases, renderRecentReleaseCard]);
 
   // ============================================================================
-  // EFFECTS
+  // **LIFECYCLE EFFECTS**
   // ============================================================================
 
   useEffect(() => {
+    console.log('🔄 Content type changed to:', contentType);
     fetchRecentReleases();
     fetchPopularMovies();
   }, [contentType, fetchRecentReleases, fetchPopularMovies]);
+
+  // **🏠 AUTO-REFRESH WHEN MOVIES ARE RATED**
+  useEffect(() => {
+    console.log('🎬 Seen movies updated, count:', seen.length);
+    // Refresh home screen data when movies are rated to remove them from display
+    fetchRecentReleases();
+    fetchPopularMovies();
+    fetchAIRecommendations();
+  }, [seen.length, fetchRecentReleases, fetchPopularMovies, fetchAIRecommendations]);
 
   useEffect(() => {
     if (popularMovies.length > 0 && activeTab === 'new' && contentType === 'movies') {
@@ -1285,11 +1344,11 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
 
   useEffect(() => {
     if (seen.length >= 3) {
+      console.log('🤖 Fetching AI recommendations - user has', seen.length, 'rated items');
       fetchAIRecommendations();
     }
   }, [seen.length, contentType, fetchAIRecommendations]);
 
-  // Load not interested movies when component mounts or media type changes
   useEffect(() => {
     const loadNotInterested = async () => {
       const notInterestedList = await loadNotInterestedMovies();
@@ -1299,7 +1358,6 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
     loadNotInterested();
   }, [mediaType, loadNotInterestedMovies]);
 
-  // Debug useEffect to see when skippedMovies changes
   useEffect(() => {
     console.log('🔄 skippedMovies updated:', skippedMovies);
     if (skippedMovies.length > 0) {
@@ -1311,7 +1369,7 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
   }, [skippedMovies, fetchPopularMovies, fetchRecentReleases, fetchAIRecommendations]);
 
   // ============================================================================
-  // MAIN RENDER
+  // **MAIN RENDER - COLLABORATIVE UI MASTERPIECE**
   // ============================================================================
 
   return (
@@ -1323,7 +1381,7 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
       </ThemedHeader>
       <SafeAreaView style={[layoutStyles.safeArea, { backgroundColor: 'transparent' }]}>
         
-        {/* Movies Content */}
+        {/* **MOVIES CONTENT WITH ENHANCED RATING** */}
         {contentType === 'movies' && (
           <>
             <View style={[styles.tabContainer, { backgroundColor: '#1C2526' }]}>
@@ -1406,7 +1464,7 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
           </>
         )}
         
-        {/* TV Shows Content */}
+        {/* **TV SHOWS CONTENT WITH ENHANCED RATING** */}
         {contentType === 'tv' && (
           <>
             <View style={[styles.tabContainer, { backgroundColor: '#1C2526' }]}>
@@ -1488,7 +1546,7 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
           </>
         )}
         
-        {/* Movie Detail Modal */}
+        {/* **MOVIE DETAIL MODAL WITH ENHANCED RATING INTEGRATION** */}
         <Modal
           visible={movieDetailModalVisible}
           transparent
@@ -1551,15 +1609,23 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
               </View>
               
               <View style={modalStyles.buttonRow}>
-                <TouchableOpacity 
-                  style={modalStyles.actionButton}
-                  onPress={openRatingModal}
-                >
-                  <Text style={modalStyles.actionButtonText}>Rate</Text>
-                </TouchableOpacity>
+                {/* **🚀 ENHANCED RATING BUTTON IN MODAL** */}
+                <View style={{ flex: 1, marginHorizontal: 4 }}>
+                  <EnhancedRatingButton
+                    movie={selectedMovie}
+                    seen={seen}
+                    onAddToSeen={onAddToSeen}
+                    onUpdateRating={onUpdateRating}
+                    colors={colors}
+                    buttonStyles={buttonStyles}
+                    modalStyles={modalStyles}
+                    genres={genres}
+                    mediaType={mediaType}
+                  />
+                </View>
                 
                 <TouchableOpacity 
-                  style={modalStyles.actionButton}
+                  style={[modalStyles.actionButton, { flex: 1, marginHorizontal: 4 }]}
                   onPress={handleWatchlistToggle}
                 >
                   <Text style={modalStyles.actionButtonText}>
@@ -1568,7 +1634,7 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
-                  style={modalStyles.actionButton}
+                  style={[modalStyles.actionButton, { flex: 1, marginHorizontal: 4 }]}
                   onPress={handleNotInterested}
                 >
                   <Text style={modalStyles.actionButtonText}>Not Interested</Text>
@@ -1582,7 +1648,7 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
           </View>
         </Modal>
 
-        {/* Rating Input Modal */}
+        {/* **LEGACY RATING MODAL (FALLBACK)** */}
         <RatingModal
           visible={ratingModalVisible}
           onClose={closeRatingModal}
@@ -1602,11 +1668,11 @@ function HomeScreen({ seen, unseen, setSeen, setUnseen, genres, newReleases, isD
 }
 
 // ============================================================================
-// STYLES
+// **ENHANCED STYLES SYSTEM**
 // ============================================================================
 
 const styles = StyleSheet.create({
-  // Tab Layout
+  // **Tab Layout**
   tabContainer: {
     flexDirection: 'row',
     borderBottomWidth: 1,
@@ -1618,7 +1684,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   
-  // Section Layout
+  // **Section Layout**
   sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1626,7 +1692,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   
-  // Carousel and Card Layout
+  // **Carousel and Card Layout**
   moviePoster: {
     width: '100%',
     height: MOVIE_CARD_WIDTH * 1.5,
@@ -1648,7 +1714,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   
-  // Recent Releases Layout
+  // **Recent Releases Layout**
   recentCard: {
     flex: 1,
     marginRight: 16,
@@ -1659,20 +1725,21 @@ const styles = StyleSheet.create({
     height: 150,
   },
   
-  // Rating Container Layout
+  // **Rating Container Layout**
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: 4,
   },
   
-  // Loading Container
+  // **Loading Container**
   loadingContainer: {
     height: 150,
     alignItems: 'center',
     justifyContent: 'center',
   },
   
+  // **Enhanced Badge System**
   rankingBadge: {
     position: 'absolute',
     top: 8,

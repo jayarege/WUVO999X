@@ -472,58 +472,60 @@ const moviesByMediaType = useMemo(() => {
           </View>
         )}
 
-      {/* Movie/TV Show List */}
-        <ScrollView style={[listStyles.rankingsList, { backgroundColor: colors.background }]}>
-          {filteredMovies.map((item, index) => (
-            <View
-              key={item.id}
-              style={[listStyles.rankingItem, { backgroundColor: colors.card }]}
+    {/* Movie/TV Show List */}
+<ScrollView style={[listStyles.rankingsList, { backgroundColor: colors.background }]}>
+  {filteredMovies.map((item, index) => (
+    <View
+      key={item.id}
+      style={[listStyles.rankingItem, { backgroundColor: colors.card }]}
+    >
+      <Image
+        source={{ uri: getPosterUrl(item.poster || item.poster_path) }}
+        style={listStyles.resultPoster}
+        resizeMode="cover"
+      />
+    <View style={[listStyles.movieDetails, { backgroundColor: colors.card }]}>
+        <View>
+          <Text
+            style={[listStyles.resultTitle, { color: colors.text }]}
+            numberOfLines={2}
+          >
+            {item.title || item.name}
+          </Text>
+          <View style={styles.scoreContainer}>
+            <Text style={[styles.finalScore, { color: colors.accent }]}>
+              {item.score ? item.score.toFixed(1) : item.vote_average ? item.vote_average.toFixed(1) : 'N/A'}
+            </Text>
+            <Text 
+              style={[movieCardStyles.genresText, { color: colors.subText }]}
+              numberOfLines={2}
             >
-              <View style={[listStyles.rankBadge, { backgroundColor: colors.primary }]}>
-                <Text style={[listStyles.rankNumber, { color: colors.accent }]}>
-                  {index + 1}
-                </Text>
-              </View>
-              <Image
-                source={{ uri: getPosterUrl(item.poster || item.poster_path) }}
-                style={listStyles.resultPoster}
-                resizeMode="cover"
-              />
-            <View style={[listStyles.movieDetails, { backgroundColor: colors.card }]}>
-                <View>
-                  <Text
-                    style={[listStyles.resultTitle, { color: colors.text }]}
-                    numberOfLines={2}
-                  >
-                    {item.title || item.name}
-                  </Text>
-                  <View style={styles.scoreContainer}>
-                    <Text style={[styles.finalScore, { color: colors.accent }]}>
-                      {item.score ? item.score.toFixed(1) : item.vote_average ? item.vote_average.toFixed(1) : 'N/A'}
-                    </Text>
-                    <Text 
-                      style={[movieCardStyles.genresText, { color: colors.subText }]}
-                      numberOfLines={2}
-                    >
-                      Genres: {item.genre_ids && Array.isArray(item.genre_ids) 
-                        ? item.genre_ids.map(id => (genres && genres[id]) || 'Unknown').join(', ') 
-                        : 'Unknown'}
-                    </Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  style={[styles.rateButton, { backgroundColor: colors.primary }]}
-                  onPress={() => openRatingModal(item)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.rateButtonText, { color: colors.accent }]}>
-                    Rate
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
-        </ScrollView>
+              Genres: {item.genre_ids && Array.isArray(item.genre_ids) 
+                ? item.genre_ids.map(id => (genres && genres[id]) || 'Unknown').join(', ') 
+                : 'Unknown'}
+            </Text>
+          </View>
+        </View>
+        <TouchableOpacity
+          style={[styles.rateButton, { backgroundColor: colors.primary }]}
+          onPress={() => openRatingModal(item)}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.rateButtonText, { color: colors.accent }]}>
+            Rate
+          </Text>
+        </TouchableOpacity>
+      </View>
+      <View style={[listStyles.rankingContainer, { backgroundColor: colors.primary }]}>
+        <View style={[listStyles.rankBadge, { borderColor: colors.accent }]}>
+          <Text style={[listStyles.rankNumber, { color: colors.accent }]}>
+            {index + 1}
+          </Text>
+        </View>
+      </View>
+    </View>
+  ))}
+</ScrollView>
 
         {/* Enhanced Filter Modal */}
         <Modal

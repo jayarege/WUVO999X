@@ -7,7 +7,8 @@ import {
   TouchableOpacity, 
   Image, 
   ScrollView, 
-  Dimensions 
+  Dimensions,
+  Modal 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,6 +22,7 @@ const POSTER_SIZE = (width - 60) / 3; // 3 columns with spacing
 const ProfileScreen = ({ seen = [], unseen = [], isDarkMode }) => {
   const { mediaType } = useMediaType();
   const [selectedTab, setSelectedTab] = useState('posts');
+  const [showDropdown, setShowDropdown] = useState(false);
 
   // Filter content by current media type
   const currentSeen = useMemo(() => {
@@ -39,6 +41,13 @@ const ProfileScreen = ({ seen = [], unseen = [], isDarkMode }) => {
       .slice(0, 9);
   }, [currentSeen]);
 
+  // Get recently watched content (latest rated first)
+  const recentlyWatchedContent = useMemo(() => {
+    return currentSeen
+      .sort((a, b) => (b.userRating || 0) - (a.userRating || 0))
+      .slice(0, 9);
+  }, [currentSeen]);
+
   // Calculate stats
   const stats = useMemo(() => {
     const totalRated = currentSeen.length;
@@ -49,7 +58,7 @@ const ProfileScreen = ({ seen = [], unseen = [], isDarkMode }) => {
 
     return {
       posts: totalRated,
-      followers: Math.round(averageRating * 100), // Creative use of average rating
+      friends: Math.floor(Math.random() * 100) + 50, // Random friends count for demo
       following: watchlistSize
     };
   }, [currentSeen, currentUnseen]);
@@ -58,6 +67,55 @@ const ProfileScreen = ({ seen = [], unseen = [], isDarkMode }) => {
     return path 
       ? `https://image.tmdb.org/t/p/w342${path}`
       : 'https://via.placeholder.com/342x513/333/fff?text=No+Poster';
+  };
+
+  const handleDropdownSelect = (option) => {
+    setShowDropdown(false);
+    if (option === 'settings') {
+      // Handle settings navigation
+      console.log('Navigate to Settings');
+    } else if (option === 'logout') {
+      // Handle logout
+      console.log('Logout user');
+    }
+  };
+
+  const renderWatchingContent = () => {
+    const isMovies = mediaType === 'movie';
+    const contentToShow = isMovies ? recentlyWatchedContent : currentUnseen.slice(0, 9);
+    const emptyText = isMovies ? 'No recent movies' : 'Not watching anything yet';
+
+    return (
+      <View style={styles.postsGrid}>
+        {contentToShow.map((item, index) => (
+          <TouchableOpacity key={item.id} style={styles.posterContainer}>
+            <Image
+              source={{ uri: getPosterUrl(item.poster_path || item.poster) }}
+              style={styles.posterImage}
+              resizeMode="cover"
+            />
+            {isMovies && item.userRating && (
+              <View style={styles.ratingOverlay}>
+                <Text style={styles.ratingText}>{item.userRating?.toFixed(1)}</Text>
+              </View>
+            )}
+            {!isMovies && (
+              <View style={styles.watchingOverlay}>
+                <Ionicons name="play" size={16} color="#fff" />
+              </View>
+            )}
+          </TouchableOpacity>
+        ))}
+        
+        {/* Fill empty spots if less than 9 items */}
+        {Array.from({ length: Math.max(0, 9 - contentToShow.length) }).map((_, index) => (
+          <View key={`empty-${index}`} style={[styles.posterContainer, styles.emptyPoster]}>
+            <Ionicons name="add" size={40} color="#666" />
+            <Text style={styles.emptyText}>{emptyText}</Text>
+          </View>
+        ))}
+      </View>
+    );
   };
 
   const renderTabContent = () => {
@@ -87,21 +145,8 @@ const ProfileScreen = ({ seen = [], unseen = [], isDarkMode }) => {
           </View>
         );
       
-      case 'reels':
-        return (
-          <View style={styles.comingSoonContainer}>
-            <Ionicons name="film-outline" size={48} color="#666" />
-            <Text style={styles.comingSoonText}>Movie Clips Coming Soon</Text>
-          </View>
-        );
-      
-      case 'tagged':
-        return (
-          <View style={styles.comingSoonContainer}>
-            <Ionicons name="bookmark-outline" size={48} color="#666" />
-            <Text style={styles.comingSoonText}>Recommendations Coming Soon</Text>
-          </View>
-        );
+      case 'watching':
+        return renderWatchingContent();
       
       default:
         return null;
@@ -115,7 +160,7 @@ const ProfileScreen = ({ seen = [], unseen = [], isDarkMode }) => {
       </ThemedHeader>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/*-style Header */}
+        {/* Instagram-style Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.headerButton}>
             <Ionicons name="lock-closed" size={16} color="#fff" />
@@ -127,7 +172,10 @@ const ProfileScreen = ({ seen = [], unseen = [], isDarkMode }) => {
             <TouchableOpacity style={styles.iconButton}>
               <Ionicons name="add-circle-outline" size={24} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton}>
+            <TouchableOpacity 
+              style={styles.iconButton}
+              onPress={() => setShowDropdown(true)}
+            >
               <Ionicons name="menu" size={24} color="#fff" />
             </TouchableOpacity>
           </View>
@@ -151,8 +199,8 @@ const ProfileScreen = ({ seen = [], unseen = [], isDarkMode }) => {
                 <Text style={styles.statLabel}>rated</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statNumber}>{stats.followers}</Text>
-                <Text style={styles.statLabel}>score</Text>
+                <Text style={styles.statNumber}>{stats.friends}</Text>
+                <Text style={styles.statLabel}>friends</Text>
               </View>
               <View style={styles.statItem}>
                 <Text style={styles.statNumber}>{stats.following}</Text>
@@ -195,23 +243,13 @@ const ProfileScreen = ({ seen = [], unseen = [], isDarkMode }) => {
             />
           </TouchableOpacity>
           <TouchableOpacity 
-            style={[styles.tabButton, selectedTab === 'reels' && styles.activeTab]}
-            onPress={() => setSelectedTab('reels')}
+            style={[styles.tabButton, selectedTab === 'watching' && styles.activeTab]}
+            onPress={() => setSelectedTab('watching')}
           >
             <Ionicons 
-              name="play-circle" 
+              name="glasses" 
               size={24} 
-              color={selectedTab === 'reels' ? '#fff' : '#666'} 
-            />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.tabButton, selectedTab === 'tagged' && styles.activeTab]}
-            onPress={() => setSelectedTab('tagged')}
-          >
-            <Ionicons 
-              name="bookmark" 
-              size={24} 
-              color={selectedTab === 'tagged' ? '#fff' : '#666'} 
+              color={selectedTab === 'watching' ? '#fff' : '#666'} 
             />
           </TouchableOpacity>
         </View>
@@ -219,6 +257,37 @@ const ProfileScreen = ({ seen = [], unseen = [], isDarkMode }) => {
         {/* Tab Content */}
         {renderTabContent()}
       </ScrollView>
+
+      {/* Dropdown Modal */}
+      <Modal
+        visible={showDropdown}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowDropdown(false)}
+      >
+        <TouchableOpacity 
+          style={styles.dropdownOverlay}
+          onPress={() => setShowDropdown(false)}
+        >
+          <View style={styles.dropdownContainer}>
+            <TouchableOpacity 
+              style={styles.dropdownItem}
+              onPress={() => handleDropdownSelect('settings')}
+            >
+              <Ionicons name="settings-outline" size={20} color="#fff" />
+              <Text style={styles.dropdownText}>Settings</Text>
+            </TouchableOpacity>
+            <View style={styles.dropdownSeparator} />
+            <TouchableOpacity 
+              style={styles.dropdownItem}
+              onPress={() => handleDropdownSelect('logout')}
+            >
+              <Ionicons name="log-out-outline" size={20} color="#ff4444" />
+              <Text style={[styles.dropdownText, { color: '#ff4444' }]}>Logout</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -242,7 +311,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
   },
   
- 
+  // Instagram-style Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -451,6 +520,17 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
   },
+  watchingOverlay: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
   emptyPoster: {
     backgroundColor: '#262626',
     justifyContent: 'center',
@@ -459,6 +539,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333',
     borderStyle: 'dashed',
+  },
+  emptyText: {
+    color: '#666',
+    fontSize: 10,
+    marginTop: 4,
+    textAlign: 'center',
   },
   
   // Coming Soon Section
@@ -475,5 +561,40 @@ const styles = StyleSheet.create({
     marginTop: 12,
     textAlign: 'center',
   },
+
+  // Dropdown Styles
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 100,
+    paddingRight: 16,
+  },
+  dropdownContainer: {
+    backgroundColor: '#262626',
+    borderRadius: 8,
+    paddingVertical: 8,
+    minWidth: 150,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  dropdownText: {
+    color: '#fff',
+    fontSize: 16,
+    marginLeft: 12,
+  },
+  dropdownSeparator: {
+    height: 1,
+    backgroundColor: '#333',
+    marginVertical: 4,
+  },
 });
+
 export default ProfileScreen;

@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-// Function to get themed list styles
+// Function to get themed list styles with right-side ranking
 const getListStyles = (mediaType = 'movie', mode = 'light', theme) => {
   const colors = theme[mediaType][mode];
 
@@ -23,103 +23,124 @@ const getListStyles = (mediaType = 'movie', mode = 'light', theme) => {
       shadowOpacity: 0.1,
       shadowRadius: 4,
       elevation: 3,
+      // New: Ensure consistent height for alignment
+      minHeight: 150,
     },
     resultPoster: {
       width: 100,
       height: 150,
+      // Remove any overlay positioning since ranking badge is moved
     },
     movieDetails: {
       flex: 1,
-      padding: 12, // Reduced for more content space
-      height: 150, // Match poster height exactly
-      justifyContent: 'space-between', // Distribute content evenly
+      padding: 12,
+      height: 150,
+      justifyContent: 'space-between',
       backgroundColor: colors.card,
-      overflow: 'hidden', // Prevent content overflow
+      overflow: 'hidden',
+      // New: Add spacing from right ranking area
+      paddingRight: 8,
     },
     resultTitle: {
-      fontSize: 16, // Reduced from 18 for better fit
+      fontSize: 16,
       fontWeight: 'bold',
-      marginBottom: 4, // Reduced from 8
+      marginBottom: 4,
       color: colors.text,
-      fontFamily: colors.font.header, // Cooper Black for movies, American Typewriter Bold for TV
-      height: 38, // Fixed height for up to 2 lines
+      fontFamily: colors.font.header,
+      height: 38,
       textAlignVertical: 'top',
+      // New: Ensure title doesn't overlap with ranking
+      paddingRight: 4,
     },
     resultYear: {
-      fontSize: 13, // Slightly reduced
-      marginBottom: 3, // Reduced margin
+      fontSize: 13,
+      marginBottom: 3,
       color: colors.subText,
-      fontFamily: colors.font.body, // Bookman Old Style for movies, Helvetica Neue for TV
+      fontFamily: colors.font.body,
     },
     resultOverview: {
-      fontSize: 13, // Slightly reduced
-      lineHeight: 16, // Tighter line height
+      fontSize: 13,
+      lineHeight: 16,
       color: colors.text,
       fontFamily: colors.font.body,
-      numberOfLines: 2, // Limit to 2 lines
+      numberOfLines: 2,
       ellipsizeMode: 'tail',
     },
     resultRating: {
-      fontSize: 13, // Slightly reduced
-      marginTop: 4, // Reduced margin
+      fontSize: 13,
+      marginTop: 4,
       color: colors.accent,
       fontFamily: colors.font.body,
       fontWeight: '600',
     },
-    rankBadge: {
-      width: 36, // Slightly larger to fit bigger number
-      height: 36,
-      borderRadius: 18,
+    
+    // UPDATED: Right-side ranking container
+    rankingContainer: {
+      width: 60, // Fixed width for consistency
+      height: 150,
+      justifyContent: 'center',
+      alignItems: 'center',
       backgroundColor: colors.primary,
+      // Optional: Add subtle gradient or pattern
+    },
+    
+    // UPDATED: Larger, more prominent ranking badge
+    rankBadge: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: 'rgba(255, 255, 255, 0.15)', // Subtle overlay
       alignItems: 'center',
       justifyContent: 'center',
-      position: 'absolute',
-      top: 10,
-      left: 10,
-      zIndex: 1,
+      // Remove absolute positioning
+      borderWidth: 2,
+      borderColor: colors.accent,
     },
+    
+    // UPDATED: Much larger ranking number
     rankNumber: {
       fontWeight: 'bold',
-      fontSize: 32, // 2x larger (16 * 2 = 32)
-      color: colors.text,
-      fontFamily: colors.font.body,
+      fontSize: 24, // Increased from 16 for prominence
+      color: colors.accent,
+      fontFamily: colors.font.header,
+      textAlign: 'center',
     },
     
     // Additional optimized styles for content fitting
     scoreContainer: {
-      marginTop: 2, // Minimal margin
-      flexGrow: 1, // Take available space
+      marginTop: 2,
+      flexGrow: 1,
       justifyContent: 'center',
     },
     finalScore: {
-      fontSize: 18, // Reduced from 24
+      fontSize: 18,
       fontWeight: 'bold',
-      marginBottom: 4, // Reduced margin
+      marginBottom: 4,
       color: colors.accent,
     },
     genresText: {
-      fontSize: 11, // Smaller for better fit
+      fontSize: 11,
       color: colors.subText,
-      numberOfLines: 1, // Single line only
+      numberOfLines: 1,
       ellipsizeMode: 'tail',
       marginBottom: 4,
     },
     editButton: {
-      paddingVertical: 6, // Smaller button
+      paddingVertical: 6,
       paddingHorizontal: 12,
       borderRadius: 6,
       alignSelf: 'flex-start',
       backgroundColor: colors.primary,
     },
     editButtonText: {
-      fontSize: 13, // Slightly smaller
+      fontSize: 13,
       fontWeight: '600',
       color: colors.accent,
     },
   });
 };
 
-// Keep original static styles for backward compatibility
+// Updated static styles for backward compatibility
 const listStyles = StyleSheet.create({
   rankingsList: {
     flex: 1,
@@ -137,6 +158,7 @@ const listStyles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    minHeight: 150,
   },
   resultPoster: {
     width: 100,
@@ -144,35 +166,46 @@ const listStyles = StyleSheet.create({
   },
   movieDetails: {
     flex: 1,
-    padding: 12, // Reduced for more content space
-    height: 150, // Match poster height exactly
-    justifyContent: 'space-between', // Distribute content evenly
-    overflow: 'hidden', // Prevent content overflow
+    padding: 12,
+    height: 150,
+    justifyContent: 'space-between',
+    overflow: 'hidden',
+    paddingRight: 8,
   },
   resultTitle: {
-    fontSize: 16, // Reduced from 18
+    fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 4, // Reduced from 8
-    height: 38, // Fixed height for up to 2 lines
+    marginBottom: 4,
+    height: 38,
     textAlignVertical: 'top',
+    paddingRight: 4,
+  },
+  
+  // Updated ranking styles
+  rankingContainer: {
+    width: 60,
+    height: 150,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#8B5CF6',
   },
   rankBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    zIndex: 1,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   rankNumber: {
     fontWeight: 'bold',
-    fontSize: 32, // 2x larger (16 * 2 = 32)
+    fontSize: 24,
+    color: '#FFFFFF',
+    textAlign: 'center',
   },
   
-  // Additional static styles for content fitting
   scoreContainer: {
     marginTop: 2,
     flexGrow: 1,

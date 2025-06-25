@@ -364,55 +364,57 @@ return (
         )}
       </View>
       
-      {/* Rankings List */}
-      {filteredAndRankedMovies.length > 0 ? (
-        <ScrollView style={[listStyles.rankingsList, { backgroundColor: colors.background }]}>
-          {filteredAndRankedMovies.map((movie, index) => (
-            <View
-              key={movie.id}
-              style={[listStyles.rankingItem, { backgroundColor: colors.card }]}
-            >
-              <View style={[listStyles.rankBadge, { backgroundColor: colors.primary }]}>
-                <Text style={[listStyles.rankNumber, { color: colors.accent }]}>
-                  {index + 1}
-                </Text>
-              </View>
-              <Image
-                source={{ uri: getPosterUrl(movie.poster || movie.poster_path) }}
-                style={listStyles.resultPoster}
-                resizeMode="cover"
-              />
-              <View style={[listStyles.movieDetails, { backgroundColor: colors.card }]}>
-                <Text
-                  style={[listStyles.resultTitle, { color: colors.text }]}
-                  numberOfLines={2}
-                >
-                  {getTitle(movie)}
-                </Text>
-                <View style={styles.scoreContainer}>
-                  <Text style={[styles.finalScore, { color: colors.accent }]}>
-                    {displayRating(movie)}
-                  </Text>
-                  <Text style={[movieCardStyles.genresText, { color: colors.subText }]}>
-                    Genres: {movie.genre_ids && Array.isArray(movie.genre_ids) 
-                      ? movie.genre_ids.map(id => (genres && genres[id]) || 'Unknown').join(', ') 
-                      : 'Unknown'}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={[styles.editButton, { backgroundColor: colors.primary }]}
-                  onPress={() => openEditModal(movie)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.editButtonText, { color: colors.accent }]}>
-                    Edit Rating
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
-        </ScrollView>
-      ) : (
+     {/* Rankings List */}
+{filteredAndRankedMovies.length > 0 ? (
+  <ScrollView style={[listStyles.rankingsList, { backgroundColor: colors.background }]}>
+    {filteredAndRankedMovies.map((movie, index) => (
+      <View
+        key={movie.id}
+        style={[listStyles.rankingItem, { backgroundColor: colors.card }]}
+      >
+        <Image
+          source={{ uri: getPosterUrl(movie.poster || movie.poster_path) }}
+          style={listStyles.resultPoster}
+          resizeMode="cover"
+        />
+        <View style={[listStyles.movieDetails, { backgroundColor: colors.card }]}>
+          <Text
+            style={[listStyles.resultTitle, { color: colors.text }]}
+            numberOfLines={2}
+          >
+            {getTitle(movie)}
+          </Text>
+          <View style={styles.scoreContainer}>
+            <Text style={[styles.finalScore, { color: colors.accent }]}>
+              {displayRating(movie)}
+            </Text>
+            <Text style={[movieCardStyles.genresText, { color: colors.subText }]}>
+              Genres: {movie.genre_ids && Array.isArray(movie.genre_ids) 
+                ? movie.genre_ids.map(id => (genres && genres[id]) || 'Unknown').join(', ') 
+                : 'Unknown'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.editButton, { backgroundColor: colors.primary }]}
+            onPress={() => openEditModal(movie)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.editButtonText, { color: colors.accent }]}>
+              Edit Rating
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <View style={[listStyles.rankingContainer, { backgroundColor: colors.primary }]}>
+          <View style={[listStyles.rankBadge, { borderColor: colors.accent }]}>
+            <Text style={[listStyles.rankNumber, { color: colors.accent }]}>
+              {index + 1}
+            </Text>
+          </View>
+        </View>
+      </View>
+    ))}
+  </ScrollView>
+): (
         <View style={stateStyles.emptyStateContainer}>
           <Ionicons name="search-outline" size={64} color={colors.subText} />
           <Text style={[stateStyles.emptyStateText, { color: colors.subText }]}>
