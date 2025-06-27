@@ -869,6 +869,7 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     padding: 24,
     borderRadius: 16,
+    maxHeight: '80%',
   },
   modalTitle: {
     fontSize: 20,
@@ -883,14 +884,16 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sentimentGrid: {
-    gap: 16,
+    gap: 12,
     marginBottom: 24,
+    maxHeight: 400,
   },
   sentimentButton: {
-    padding: 20,
+    padding: 16,
     borderRadius: 12,
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
+    minHeight: 80,
   },
   sentimentEmoji: {
     fontSize: 32,

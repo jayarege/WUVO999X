@@ -79,12 +79,11 @@ const RatingModal = ({
               end={{ x: 1, y: 1 }}
               style={{ 
                 flex: 1, 
-                borderRadius: 20, 
-                justifyContent: 'space-between',
-                paddingBottom: Platform.OS === 'ios' ? 20 : 10 // Extra bottom padding
+                borderRadius: 20,
+                position: 'relative'
               }}
             >
-              <View style={ratingStyles.modalContentContainer}>
+              <View style={[ratingStyles.modalContentContainer, { paddingBottom: 80 }]}>
                 <View style={modalStyles.modalHandle} />
                 
                 {/* Movie Info */}
@@ -133,7 +132,7 @@ const RatingModal = ({
                 </Text>
               </View>
               
-              {/* Modal buttons */}
+              {/* Modal buttons - Fixed at bottom */}
               <View style={ratingStyles.fixedButtonsContainer}>
                 <TouchableOpacity
                   style={[modalStyles.modalButton, { backgroundColor: colors.accent }]}
