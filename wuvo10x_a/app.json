@@ -32,8 +32,6 @@
         "projectId": "your-project-id"
       }
     },
-    "plugins": [
-      "expo-auth-session"
-    ]
+    "plugins": []
   }
 }
