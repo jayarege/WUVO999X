@@ -22,6 +22,9 @@ import { useAuth } from './src/hooks/useAuth';
 import { useMovieData } from './src/hooks/useMovieData';
 import { useAsyncStorage } from './src/hooks/useAsyncStorage';
 
+// For quick testing, uncomment the line below to use the simple version
+// export { default } from './AppSimple';
+
 export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [appReady, setAppReady] = useState(true);
