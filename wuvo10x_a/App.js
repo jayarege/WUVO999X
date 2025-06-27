@@ -23,8 +23,8 @@ import { useMovieData } from './src/hooks/useMovieData';
 import { useAsyncStorage } from './src/hooks/useAsyncStorage';
 
 export default function App() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [appReady, setAppReady] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [appReady, setAppReady] = useState(true);
 
   // Custom hooks
   const { 
@@ -64,6 +64,27 @@ export default function App() {
     resetAllUserData,
     savePreferences
   } = useAsyncStorage();
+
+  // Add this debug section after your hooks
+  console.log('Debug state:', {
+    isLoading,
+    appReady,
+    isAuthenticated,
+    checkingOnboarding,
+    onboardingComplete
+  });
+
+  // If stuck in loading, force it to continue after 3 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (isLoading) {
+        console.log('Forcing loading to complete');
+        setIsLoading(false);
+        setAppReady(true);
+      }
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [isLoading]);
 
   // Combined reset function that uses both hooks
   const resetAllAppData = useCallback(async () => {
@@ -117,7 +138,7 @@ export default function App() {
     <SafeAreaProvider>
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-          {!isAuthenticated ? (
+          {false ? (
             // Auth flow
             <Stack.Screen name="Auth">
               {props => (
@@ -128,7 +149,7 @@ export default function App() {
                 />
               )}
             </Stack.Screen>
-          ) : checkingOnboarding ? (
+          ) : false ? (
             // Checking onboarding
             <Stack.Screen name="CheckingOnboarding">
               {props => (
@@ -139,7 +160,7 @@ export default function App() {
                 />
               )}
             </Stack.Screen>
-          ) : !onboardingComplete ? (
+          ) : false ? (
             // Onboarding flow
             <Stack.Screen name="Onboarding">
               {props => (
