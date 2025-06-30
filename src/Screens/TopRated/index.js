@@ -380,7 +380,8 @@ return (
         <View style={[listStyles.movieDetails, { backgroundColor: colors.card }]}>
           <Text
             style={[listStyles.resultTitle, { color: colors.text }]}
-            numberOfLines={2}
+            numberOfLines={1}
+            ellipsizeMode="tail"
           >
             {getTitle(movie)}
           </Text>
@@ -400,7 +401,7 @@ return (
             activeOpacity={0.7}
           >
             <Text style={[styles.editButtonText, { color: colors.accent }]}>
-              Edit Rating
+              Update Rating
             </Text>
           </TouchableOpacity>
         </View>

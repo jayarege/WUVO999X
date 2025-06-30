@@ -221,7 +221,7 @@ function AuthScreen({ onAuthenticate, isDarkMode }) {
           </Text>
           
           <Text style={[styles.footerSubtext, { color: isDarkMode ? '#A9A9A9' : '#999' }]}>
-            Demo mode: Authentication is simulated
+            Real authentication enabled
           </Text>
         </View>
       </View>

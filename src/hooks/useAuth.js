@@ -25,12 +25,27 @@ export const useAuth = () => {
   }, []);
 
   const handleLogout = useCallback(async () => {
-    if (!isDevModeEnabled()) {
-      await AsyncStorage.removeItem(STORAGE_KEYS.USER.SESSION);
+    try {
+      if (!isDevModeEnabled()) {
+        // Clear all user-related data on logout to ensure fresh onboarding
+        await AsyncStorage.multiRemove([
+          STORAGE_KEYS.USER.SESSION,
+          STORAGE_KEYS.USER.PREFERENCES,
+          STORAGE_KEYS.USER.ONBOARDING_COMPLETE,
+          // Also clear any movie data to start fresh
+          STORAGE_KEYS.MOVIES.SEEN,
+          STORAGE_KEYS.MOVIES.UNSEEN
+        ]);
+      }
+      
+      setUserInfo(null);
+      setIsAuthenticated(false);
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still logout even if storage clearing fails
+      setUserInfo(null);
+      setIsAuthenticated(false);
     }
-    
-    setUserInfo(null);
-    setIsAuthenticated(false);
   }, []);
 
   const initializeAuth = useCallback(async () => {

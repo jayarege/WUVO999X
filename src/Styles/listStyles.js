@@ -47,7 +47,8 @@ const getListStyles = (mediaType = 'movie', mode = 'light', theme) => {
       marginBottom: 4,
       color: colors.text,
       fontFamily: colors.font.header,
-      height: 38,
+      minHeight: 20,
+      maxHeight: 38,
       textAlignVertical: 'top',
       // New: Ensure title doesn't overlap with ranking
       paddingRight: 4,

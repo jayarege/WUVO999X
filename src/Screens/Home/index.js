@@ -42,6 +42,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // **ENHANCED RATING SYSTEM IMPORT**
 import { getRatingCategory, calculateDynamicRatingCategories } from '../../Components/EnhancedRatingSystem';
+import InitialRatingFlow from '../InitialRatingFlow';
 
 // Helper functions for calculating range from percentile (moved from component)
 const getRatingRangeFromPercentile = (userMovies, percentile) => {
@@ -116,6 +117,7 @@ function HomeScreen({
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [movieDetailModalVisible, setMovieDetailModalVisible] = useState(false);
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
+  const [initialRatingFlowVisible, setInitialRatingFlowVisible] = useState(false);
   const [ratingInput, setRatingInput] = useState('');
   const [recentReleases, setRecentReleases] = useState([]);
   const [popularMovies, setPopularMovies] = useState([]);
@@ -914,6 +916,34 @@ function HomeScreen({
     setMovieCredits(null);
     setMovieProviders(null);
   }, []);
+
+  // **INITIAL RATING FLOW FUNCTIONS**
+  const openInitialRatingFlow = useCallback(() => {
+    setInitialRatingFlowVisible(true);
+  }, []);
+
+  const closeInitialRatingFlow = useCallback(() => {
+    setInitialRatingFlowVisible(false);
+    setSelectedMovie(null);
+  }, []);
+
+  const handleInitialRatingComplete = useCallback((ratedMovie) => {
+    console.log('🎬 Initial rating flow completed:', ratedMovie);
+    
+    // Add to seen list with the calibrated rating
+    onAddToSeen(ratedMovie);
+    
+    // Close the flow
+    setInitialRatingFlowVisible(false);
+    setSelectedMovie(null);
+    
+    // Show success feedback
+    Alert.alert(
+      "Rating Complete!",
+      `${ratedMovie.title} has been rated ${ratedMovie.userRating}/10 and added to your collection.`,
+      [{ text: "OK" }]
+    );
+  }, [onAddToSeen]);
   
   const submitRating = useCallback(() => {
     const rating = parseFloat(ratingInput);
@@ -1915,14 +1945,25 @@ function HomeScreen({
                   pointerEvents={showSentimentButtons ? 'none' : 'auto'}
                 >
                   <TouchableOpacity 
-                    style={[modalStyles.actionButton, { flex: 1, marginHorizontal: 4 }]}
+                    style={[modalStyles.actionButton, { flex: 1, marginHorizontal: 2 }]}
                     onPress={openRatingModal}
                   >
-                    <Text style={modalStyles.actionButtonText}>Rate</Text>
+                    <Text style={modalStyles.actionButtonText}>Quick Rate</Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity 
-                    style={[modalStyles.actionButton, { flex: 1, marginHorizontal: 4 }]}
+                    style={[modalStyles.actionButton, { flex: 1, marginHorizontal: 2, backgroundColor: colors.accent }]}
+                    onPress={() => {
+                      setSelectedMovie(selectedMovie);
+                      openInitialRatingFlow();
+                      setMovieDetailModalVisible(false);
+                    }}
+                  >
+                    <Text style={[modalStyles.actionButtonText, { color: '#FFF' }]}>Smart Rate</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[modalStyles.actionButton, { flex: 1, marginHorizontal: 2 }]}
                     onPress={handleWatchlistToggle}
                   >
                     <Text style={modalStyles.actionButtonText}>
@@ -2144,6 +2185,16 @@ function HomeScreen({
           isDarkMode={isDarkMode}
           theme={theme}
           genres={genres}
+        />
+
+        {/* **INITIAL RATING FLOW MODAL** */}
+        <InitialRatingFlow
+          visible={initialRatingFlowVisible}
+          movie={selectedMovie}
+          seenMovies={seen}
+          onClose={closeInitialRatingFlow}
+          onComplete={handleInitialRatingComplete}
+          isDarkMode={isDarkMode}
         />
       </SafeAreaView>
     </View>

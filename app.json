@@ -32,6 +32,8 @@
         "projectId": "your-project-id"
       }
     },
-    "plugins": []
+    "plugins": [
+      "expo-apple-authentication"
+    ]
   }
 }

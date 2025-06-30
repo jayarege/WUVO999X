@@ -141,7 +141,7 @@ export default function App() {
     <SafeAreaProvider>
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-          {false ? (
+          {!isAuthenticated ? (
             // Auth flow
             <Stack.Screen name="Auth">
               {props => (
@@ -152,7 +152,7 @@ export default function App() {
                 />
               )}
             </Stack.Screen>
-          ) : false ? (
+          ) : checkingOnboarding ? (
             // Checking onboarding
             <Stack.Screen name="CheckingOnboarding">
               {props => (
@@ -163,7 +163,7 @@ export default function App() {
                 />
               )}
             </Stack.Screen>
-          ) : false ? (
+          ) : !onboardingComplete ? (
             // Onboarding flow
             <Stack.Screen name="Onboarding">
               {props => (

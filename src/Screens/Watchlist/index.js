@@ -488,9 +488,10 @@ const moviesByMediaType = useMemo(() => {
         <View>
           <Text
             style={[listStyles.resultTitle, { color: colors.text }]}
-            numberOfLines={2}
+            numberOfLines={1}
+            ellipsizeMode="tail"
           >
-            {item.title || item.name}
+            {item.title || item.name || 'Unknown Title'}
           </Text>
           <View style={styles.scoreContainer}>
             <Text style={[styles.finalScore, { color: colors.accent }]}>

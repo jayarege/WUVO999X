@@ -8,21 +8,29 @@ import {
   Image, 
   ScrollView, 
   Dimensions,
-  Modal 
+  Modal,
+  Alert 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMediaType } from '../../Navigation/TabNavigator';
 import { ThemedHeader } from '../../Styles/headerStyles';
 import theme from '../../utils/Theme';
+import UserSearchModal from '../../Components/UserSearchModal';
+import { useAuth } from '../../hooks/useAuth';
 
 const { width } = Dimensions.get('window');
 const POSTER_SIZE = (width - 60) / 3; // 3 columns with spacing
 
 const ProfileScreen = ({ seen = [], unseen = [], isDarkMode }) => {
   const { mediaType } = useMediaType();
+  const { handleLogout } = useAuth();
   const [selectedTab, setSelectedTab] = useState('posts');
   const [showDropdown, setShowDropdown] = useState(false);
+  const [searchModalVisible, setSearchModalVisible] = useState(false);
+  
+  // TODO: Replace with actual current user ID from Firebase Auth
+  const currentUserId = 'demo-user-123';
 
   // Filter content by current media type
   const currentSeen = useMemo(() => {
@@ -69,14 +77,18 @@ const ProfileScreen = ({ seen = [], unseen = [], isDarkMode }) => {
       : 'https://via.placeholder.com/342x513/333/fff?text=No+Poster';
   };
 
-  const handleDropdownSelect = (option) => {
+  const handleDropdownSelect = async (option) => {
     setShowDropdown(false);
     if (option === 'settings') {
       // Handle settings navigation
       console.log('Navigate to Settings');
     } else if (option === 'logout') {
-      // Handle logout
-      console.log('Logout user');
+      try {
+        await handleLogout();
+      } catch (error) {
+        console.error('Logout error:', error);
+        Alert.alert('Error', 'Failed to logout. Please try again.');
+      }
     }
   };
 
@@ -171,6 +183,12 @@ const ProfileScreen = ({ seen = [], unseen = [], isDarkMode }) => {
           <View style={styles.headerIcons}>
             <TouchableOpacity style={styles.iconButton}>
               <Ionicons name="add-circle-outline" size={24} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.iconButton}
+              onPress={() => setSearchModalVisible(true)}
+            >
+              <Ionicons name="search" size={24} color="#fff" />
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.iconButton}
@@ -288,6 +306,18 @@ const ProfileScreen = ({ seen = [], unseen = [], isDarkMode }) => {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* User Search Modal */}
+      <UserSearchModal
+        visible={searchModalVisible}
+        onClose={() => setSearchModalVisible(false)}
+        currentUserId={currentUserId}
+        onUserSelect={(user) => {
+          console.log('User selected:', user);
+          // TODO: Navigate to user's public profile
+        }}
+        isDarkMode={isDarkMode}
+      />
     </View>
   );
 };
