@@ -37,13 +37,62 @@ export const INITIAL_GENRES = {
 
 // Streaming services
 export const STREAMING_SERVICES = [
-  { id: 8, name: 'Netflix' },
-  { id: 350, name: 'Apple TV+' },
-  { id: 15, name: 'Hulu' },
-  { id: 384, name: 'HBO Max' },
-  { id: 337, name: 'Disney+' },
-  { id: 387, name: 'Peacock' },
-  { id: 9, name: 'Prime Video' }
+  { 
+    id: 8, 
+    name: 'Netflix', 
+    icon: 'netflix',
+    iconFamily: 'MaterialCommunityIcons',
+    brandColor: '#E50914',
+    fallbackText: 'NET'
+  },
+  { 
+    id: 350, 
+    name: 'Apple TV+', 
+    icon: 'apple',
+    iconFamily: 'MaterialCommunityIcons', 
+    brandColor: '#000000',
+    fallbackText: 'ATV'
+  },
+  { 
+    id: 15, 
+    name: 'Hulu', 
+    icon: 'hulu',
+    iconFamily: 'MaterialCommunityIcons',
+    brandColor: '#1CE783',
+    fallbackText: 'HULU'
+  },
+  { 
+    id: 384, 
+    name: 'HBO Max', 
+    icon: 'television-classic',
+    iconFamily: 'MaterialCommunityIcons',
+    brandColor: '#8560A8',
+    fallbackText: 'HBO'
+  },
+  { 
+    id: 337, 
+    name: 'Disney+', 
+    icon: 'disney',
+    iconFamily: 'MaterialCommunityIcons',
+    brandColor: '#113CCF',
+    fallbackText: 'DIS+'
+  },
+  { 
+    id: 387, 
+    name: 'Peacock', 
+    icon: 'television',
+    iconFamily: 'MaterialCommunityIcons',
+    brandColor: '#00B8CC',
+    fallbackText: 'PCCK'
+  },
+  { 
+    id: 9, 
+    name: 'Prime Video', 
+    icon: 'amazon',
+    iconFamily: 'MaterialCommunityIcons',
+    brandColor: '#00A8E1',
+    fallbackText: 'AMZN'
+  }
 ];
 
 // Decades for filtering

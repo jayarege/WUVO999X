@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,1228 +9,624 @@ import {
   ActivityIndicator,
   SafeAreaView,
   ScrollView,
-  Alert
+  Alert,
+  FlatList
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 
-// Import constants
-import { TMDB_API_KEY, ONBOARDING_COMPLETE_KEY } from '../Constants';
+// Import constants and theme
+import { TMDB_API_KEY, ONBOARDING_COMPLETE_KEY, STREAMING_SERVICES } from '../Constants';
+import { useTheme } from '../hooks/useTheme';
 
 // Constants
 const { width, height } = Dimensions.get('window');
 const API_KEY = TMDB_API_KEY;
 
-// Complete movie database for primary use
-// Replace your current movieDatabase definition with this simplified version
-const movieDatabase = [
-  { id: 238, title: "The Godfather" },
-  { id: 155, title: "The Dark Knight" },
-  { id: 121, title: "The Lord of the Rings: The Two Towers" },
-  { id: 27205, title: "Inception" },
-  { id: 157336, title: "Interstellar" },
-  { id: 98, title: "Gladiator" },
-  { id: 37165, title: "The Departed" },
-  { id: 244786, title: "Whiplash" },
-  { id: 1124, title: "The Prestige" },
-  { id: 68718, title: "Django Unchained" },
-  { id: 438631, title: "Dune: Part Two" },
-  { id: 10681, title: "WALL·E" },
-  { id: 77, title: "Memento" },
-  { id: 299536, title: "Avengers: Infinity War" },
-  { id: 324857, title: "Spider-Man: Into the Spider-Verse" },
-  { id: 569094, title: "Spider-Man: Across the Spider-Verse" },
-  { id: 16869, title: "Inglourious Basterds" },
-  { id: 49026, title: "The Dark Knight Rises" },
-  { id: 354912, title: "Coco" },
-  { id: 299534, title: "Avengers: Endgame" },
-  { id: 475557, title: "Joker" },
-  { id: 641, title: "Requiem for a Dream" },
-  { id: 10193, title: "Toy Story 3" },
-  { id: 301528, title: "Toy Story 4" },
-  { id: 38, title: "Eternal Sunshine of the Spotless Mind" },
-  { id: 14160, title: "Up" },
-  { id: 872585, title: "Oppenheimer" },
-  { id: 107, title: "Snatch" },
-  { id: 530915, title: "1917" },
-  { id: 106646, title: "The Wolf of Wall Street" },
-  { id: 556574, title: "Hamilton" },
-  { id: 490132, title: "Green Book" },
-  { id: 272, title: "Batman Begins" },
-  { id: 11324, title: "Shutter Island" },
-  { id: 601434, title: "The Father" },
-  { id: 7491, title: "There Will Be Blood" },
-  { id: 361743, title: "Top Gun: Maverick" },
-  { id: 359724, title: "Ford v Ferrari" },
-  { id: 6977, title: "No Country for Old Men" },
-  { id: 453, title: "A Beautiful Mind" },
-  { id: 24, title: "Kill Bill: Vol. 1" },
-  { id: 146233, title: "Prisoners" },
-  { id: 12, title: "Finding Nemo" },
-  { id: 508439, title: "Klaus" },
-  { id: 752, title: "V for Vendetta" },
-  { id: 150540, title: "Inside Out" },
-  { id: 359940, title: "Three Billboards Outside Ebbing, Missouri" },
-  { id: 640, title: "Catch Me If You Can" },
-  { id: 59440, title: "Warrior" },
-  { id: 12444, title: "Harry Potter and the Deathly Hallows: Part 2" },
-  { id: 2649, title: "Gran Torino" },
-  { id: 70, title: "Million Dollar Baby" },
-  { id: 76341, title: "Mad Max: Fury Road" },
-  { id: 634649, title: "Spider-Man: No Way Home" },
-  { id: 76203, title: "12 Years a Slave" },
-  { id: 120467, title: "The Grand Budapest Hotel" },
-  { id: 324786, title: "Hacksaw Ridge" },
-  { id: 210577, title: "Gone Girl" },
-  { id: 2062, title: "Ratatouille" },
-  { id: 585, title: "Monsters, Inc." },
-  { id: 10191, title: "How to Train Your Dragon" },
-  { id: 263115, title: "Logan" },
-  { id: 227306, title: "Spotlight" },
-  { id: 22, title: "Pirates of the Caribbean: The Curse of the Black Pearl" },
-  { id: 264644, title: "Room" },
-  { id: 4800, title: "Hotel Rwanda" },
-  { id: 80, title: "Before Sunset" },
-  { id: 9806, title: "The Incredibles" },
-  { id: 28178, title: "Hachi: A Dog's Tale" },
-  { id: 96721, title: "Rush" },
-  { id: 5915, title: "Into the Wild" },
-  { id: 50014, title: "The Help" },
-  { id: 9522, title: "Wedding Crashers" },
-  { id: 289, title: "Casablanca" },
-  { id: 872, title: "Singin' in the Rain" },
-  { id: 496243, title: "Parasite" },
-  { id: 637, title: "Life Is Beautiful" },
-  { id: 603, title: "The Matrix" },
-  { id: 550, title: "Fight Club" },
-  { id: 769, title: "Goodfellas" },
-  { id: 680, title: "Pulp Fiction" },
-  { id: 278, title: "The Shawshank Redemption" },
-  { id: 13, title: "Forrest Gump" },
-  { id: 857, title: "Saving Private Ryan" },
-  { id: 597, title: "Titanic" },
-  { id: 497, title: "The Green Mile" },
-  { id: 14, title: "American Beauty" },
-  { id: 745, title: "The Sixth Sense" },
-  { id: 807, title: "L.A. Confidential" },
-  { id: 4995, title: "Boogie Nights" },
-  { id: 627, title: "Trainspotting" },
-  { id: 807, title: "Se7en" },
-  { id: 629, title: "The Usual Suspects" },
-  { id: 500, title: "Reservoir Dogs" },
-  { id: 621, title: "Heat" },
-  { id: 37165, title: "The Truman Show" },
-  { id: 197, title: "Braveheart" },
-  { id: 105, title: "Back to the Future" },
-  { id: 78, title: "Blade Runner" },
-  { id: 679, title: "Aliens" },
-  { id: 562, title: "Die Hard" },
-  { id: 9377, title: "Ferris Bueller's Day Off" },
-  { id: 2108, title: "The Breakfast Club" },
-  { id: 218, title: "The Terminator" },
-  { id: 694, title: "The Shining" },
-  { id: 85, title: "Raiders of the Lost Ark" },
-  { id: 1891, title: "Star Wars: The Empire Strikes Back" },
-  { id: 601, title: "E.T. the Extra-Terrestrial" },
-  { id: 620, title: "Ghostbusters" },
-  { id: 744, title: "Top Gun" },
-  { id: 111, title: "Scarface" },
-  { id: 106, title: "Predator" },
-  { id: 9340, title: "The Goonies" },
-  { id: 235, title: "Stand by Me" },
-  { id: 600, title: "Full Metal Jacket" },
-  { id: 793, title: "Blue Velvet" },
-  { id: 1578, title: "Raging Bull" },
-  { id: 2493, title: "The Princess Bride" }
+// Popular movies for selection (curated list)
+const POPULAR_MOVIES = [
+  { id: 238, title: "The Godfather", poster_path: "/3bhkrj58Vtu7enYsRolD1fZdja1.jpg" },
+  { id: 278, title: "The Shawshank Redemption", poster_path: "/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg" },
+  { id: 155, title: "The Dark Knight", poster_path: "/qJ2tW6WMUDux911r6m7haRef0WH.jpg" },
+  { id: 121, title: "The Lord of the Rings: The Two Towers", poster_path: "/5VTN0pR8gcqV3EPUHHfMGnJYN9L.jpg" },
+  { id: 27205, title: "Inception", poster_path: "/9gk7adHYeDvHkCSEqAvQNLV5Uge.jpg" },
+  { id: 157336, title: "Interstellar", poster_path: "/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg" },
+  { id: 98, title: "Gladiator", poster_path: "/ty8TGRuvJLPUmAR1H1nRIsgwvim.jpg" },
+  { id: 37165, title: "The Departed", poster_path: "/nT97ifVT2J1yMQmeq20Qblg61T.jpg" },
+  { id: 244786, title: "Whiplash", poster_path: "/7fn624j5lj3xTme2SgiLCeuedmO.jpg" },
+  { id: 1124, title: "The Prestige", poster_path: "/tRNlZbgNCNOpLpbPEz5L8G8A0JN.jpg" },
+  { id: 68718, title: "Django Unchained", poster_path: "/7oWY8VDWW7thTzWh3OKYRkWUlD5.jpg" },
+  { id: 438631, title: "Dune: Part Two", poster_path: "/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg" },
+  { id: 10681, title: "WALL·E", poster_path: "/hbhFnRzzg6ZDmm8YAmxBnQpQIPh.jpg" },
+  { id: 77, title: "Memento", poster_path: "/yuNs09hvpHVU1cBTCAk9zxsL2oW.jpg" },
+  { id: 299536, title: "Avengers: Infinity War", poster_path: "/7WsyChQLEftFiDOVTGkv3hFpyyt.jpg" },
+  { id: 324857, title: "Spider-Man: Into the Spider-Verse", poster_path: "/iiZZdoQBEYBv6id8su7ImL0oCbD.jpg" },
+  { id: 16869, title: "Inglourious Basterds", poster_path: "/7sfbEnaARXDDhKm0CZ7D7uc2sbo.jpg" },
+  { id: 49026, title: "The Dark Knight Rises", poster_path: "/hr0L2aueqlP2BYUblTTjmtn0hw4.jpg" },
+  { id: 354912, title: "Coco", poster_path: "/gGEsBPAijhVUFoiNpgZXqRVWJt2.jpg" },
+  { id: 299534, title: "Avengers: Endgame", poster_path: "/or06FN3Dka5tukK1e9sl16pB3iy.jpg" },
+  { id: 475557, title: "Joker", poster_path: "/udDclJoHjfjb8Ekgsd4FDteOkCU.jpg" },
+  { id: 641, title: "Requiem for a Dream", poster_path: "/nOd6vjWYB2jnGsFBVB4dKDPa9Nt.jpg" },
+  { id: 10193, title: "Toy Story 3", poster_path: "/AbbXspMOwdvwWZgVN0nabZq03Ec.jpg" },
+  { id: 301528, title: "Toy Story 4", poster_path: "/w9kR8qbmQ01HwnvK4alvnQ2ca0L.jpg" },
+  { id: 429617, title: "Spider-Man: Far From Home", poster_path: "/4q2NNj4S5dG2RLF9CpXsej7yXl.jpg" },
+  { id: 181808, title: "Star Wars: The Last Jedi", poster_path: "/kOVEVeg59E0wsnXmF9nrh6OmWII.jpg" },
+  { id: 335983, title: "Venom", poster_path: "/2uNW4WbgBXL25BAbXGLnLqX71Sw.jpg" },
+  { id: 390634, title: "The Fate of the Furious", poster_path: "/dImWM7GJqryWJO9LHa3XQ8DD5NH.jpg" },
+  { id: 284053, title: "Thor: Ragnarok", poster_path: "/rzRwTcFvttcN1ZpX2xv4j3tSdJu.jpg" },
+  { id: 284054, title: "Black Panther", poster_path: "/uxzzxijgPIY7slzFvMotPv8wjKA.jpg" }
 ];
 
-// Extend movies with additional needed data
-const completeMovieDatabase = movieDatabase.map(movie => ({
-  ...movie,
-  voteCount: Math.floor(Math.random() * 5000) + 1000,
-  release_date: "2000-01-01",
-  overview: `${movie.title} is a critically acclaimed film that has captivated audiences around the world.`
-}));
-
-// Popular genres list
-const popularGenres = [
-  { id: 28, name: "Action" },
-  { id: 12, name: "Adventure" },
-  { id: 16, name: "Animation" },
-  { id: 35, name: "Comedy" },
-  { id: 80, name: "Crime" },
-  { id: 18, name: "Drama" },
-  { id: 14, name: "Fantasy" },
-  { id: 27, name: "Horror" },
-  { id: 10749, name: "Romance" },
-  { id: 878, name: "Science Fiction" },
-  { id: 53, name: "Thriller" },
-  { id: 10752, name: "War" },
-  { id: 37, name: "Western" },
-  { id: 9648, name: "Mystery" }
-];
-
-const OnboardingScreen = ({ isDarkMode, onComplete, onAddToSeen }) => {
+const OnboardingScreen = ({ onComplete }) => {
+  // Theme integration
+  const { theme, isDark, getMediaTheme } = useTheme();
+  
   // State management
-  const [step, setStep] = useState('welcome'); // welcome, genres, movies
-  const [selectedGenres, setSelectedGenres] = useState([]);
-  const [moviesToRate, setMoviesToRate] = useState([]);
-  const [ratedMovies, setRatedMovies] = useState([]);
-  const [skippedMovies, setSkippedMovies] = useState([]);
+  const [currentStep, setCurrentStep] = useState(1); // 1: movies, 2: streaming, 3: complete
+  const [selectedMovies, setSelectedMovies] = useState([]);
+  const [selectedStreamingServices, setSelectedStreamingServices] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [welcomeIndex, setWelcomeIndex] = useState(0);
-  const [currentMovieIndex, setCurrentMovieIndex] = useState(0);
-  const [allMoviesSkipped, setAllMoviesSkipped] = useState(false);
+  const [imageLoadErrors, setImageLoadErrors] = useState(new Set());
+  const [criticalError, setCriticalError] = useState(null);
 
-  // Welcome slides data
-  const welcomeSlides = [
-    {
-      id: '1',
-      title: 'Welcome to Wuvo',
-      description: 'Your personal movie ranking app that learns what you like and helps you discover films you will love.',
-      icon: 'film-outline'
-    },
-    {
-      id: '2',
-      title: 'Rate Movies',
-      description: 'Tap on the numbers to rate movies you have seen. The more you rate, the better we understand your taste.',
-      icon: 'star-outline'
-    },
-    {
-      id: '3',
-      title: 'Compare Films',
-      description: 'In the Wildcard section, you will be shown pairs of movies to compare. This helps us fine-tune your preferences.',
-      icon: 'git-compare-outline'
-    },
-    {
-      id: '4',
-      title: 'Discover New Films',
-      description: 'The more you rate and compare, the more personalized your recommendations become.',
-      icon: 'search-outline'
-    }
-  ];
-
-  // Toggle genre selection
-  const toggleGenre = useCallback((genreId) => {
-    setSelectedGenres(prev => {
-      if (prev.includes(genreId)) {
-        return prev.filter(id => id !== genreId);
-      } else if (prev.length < 3) {
-        return [...prev, genreId];
+  // Movie selection logic
+  const toggleMovieSelection = useCallback((movie) => {
+    setSelectedMovies(prev => {
+      const isSelected = prev.some(m => m.id === movie.id);
+      if (isSelected) {
+        return prev.filter(m => m.id !== movie.id);
+      } else if (prev.length < 10) {
+        return [...prev, movie];
       }
       return prev;
     });
   }, []);
 
-const getNextMovie = useCallback(() => {
-  if (loading) return null;
-  // IDs the user has already seen
-  const doneIds = new Set([
-    ...ratedMovies.map(m => m.id),
-    ...skippedMovies
-  ]);
-  // next unseen
-  const next = moviesToRate.find(m => !doneIds.has(m.id));
-  return next || null;
-}, [moviesToRate, ratedMovies, skippedMovies, loading]);
-
-
-
-  // Updated fetchMoviesByGenres to first show only local movies matching selected genres
-// and, if none match, fetch the single most popular movie via TMDb Discover API.
-const fetchMoviesByGenres = useCallback(async () => {
-  setLoading(true);
-  setAllMoviesSkipped(false);
-  try {
-    const MIN_REQUIRED = 5;
-    const selected = [];
-    const seenIds = new Set();
-
-    // 1) Fetch details for all hard-coded movies to get their genres
-    const details = await Promise.all(
-      movieDatabase.map(m =>
-        fetch(
-          `https://api.themoviedb.org/3/movie/${m.id}?api_key=${API_KEY}&language=en-US`
-        ).then(res => res.json())
-      )
-    );
-    const validDetails = details.filter(m => m && !m.hasOwnProperty('success'));
-
-    // 2) Local matches based on genres
-    const localMatches = validDetails.filter(movie =>
-      movie.genres.some(g => selectedGenres.includes(g.id))
-    );
-    localMatches.forEach(m => {
-      selected.push({
-        id: m.id,
-        title: m.title,
-        poster: m.poster_path,
-        score: m.vote_average,
-        voteCount: m.vote_count,
-        release_date: m.release_date,
-        genre_Ids: m.genres.map(g => g.id),
-        overview: m.overview,
-        userRating: null
-      });
-      seenIds.add(m.id);
+  // Streaming service selection logic
+  const toggleStreamingService = useCallback((serviceId) => {
+    setSelectedStreamingServices(prev => {
+      const isSelected = prev.includes(serviceId);
+      if (isSelected) {
+        return prev.filter(id => id !== serviceId);
+      } else {
+        return [...prev, serviceId];
+      }
     });
-
-    // 3) Fill up to MIN_REQUIRED via Discover API
-    while (selected.length < MIN_REQUIRED) {
-      const randGenre = selectedGenres[
-        Math.floor(Math.random() * selectedGenres.length)
-      ];
-      const res = await fetch(
-        `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}` +
-        `&with_genres=${randGenre}` +
-        `&primary_release_date.gte=1980-01-01` +
-        `&sort_by=popularity.desc&page=1`
-      );
-      const data = await res.json();
-      if (!data.results?.length) break;
-      const top = data.results.find(m => !seenIds.has(m.id));
-      if (!top) break;
-      seenIds.add(top.id);
-      selected.push({
-        id: top.id,
-        title: top.title,
-        poster: top.poster_path,
-        score: top.vote_average,
-        voteCount: top.vote_count,
-        release_date: top.release_date,
-        genre_Ids: top.genre_ids,
-        overview: top.overview,
-        userRating: null
-      });
-    }
-
-    // 4) Edge: not enough unique movies
-    if (selected.length < MIN_REQUIRED) {
-      Alert.alert(
-        'No unique movies',
-        'Could not find enough unique picks. Tap OK to continue.',
-        [{ text: 'OK', onPress: handleComplete }],
-        { cancelable: false }
-      );
-      return;
-    }
-
-    setMoviesToRate(selected);
-  } catch (error) {
-    Alert.alert(
-      'No unique movies',
-      'Could not load movies. Tap OK to continue.',
-      [{ text: 'OK', onPress: handleComplete }],
-      { cancelable: false }
-    );
-  } finally {
-    setLoading(false);
-  }
-}, [selectedGenres, handleComplete]);
-
-
-
-  // Initialize movie state when moving to the movie rating screen
-  // Initialize movie state when moving to the movie rating screen
-const goToMovieRating = useCallback(() => {
-  setStep('movies');
-  setAllMoviesSkipped(false);
-  fetchMoviesByGenres();
-}, [fetchMoviesByGenres]);
-
-
-  // Handle rating a movie
-  const handleRateMovie = useCallback(async (movie, rating) => {
-    // Create a properly structured movie object with all necessary fields
-    const ratedMovie = {
-  ...movie,
-  isOnboarded: true,
-  poster_path: movie.poster || movie.poster_path || '',
-  genre_ids: movie.genre_ids || movie.genre_Ids || movie.genreIds || [],
-  userRating: rating,
-  eloRating: rating * 10,           // <— Fixed this!
-  comparisonHistory: [],
-  comparisonWins: 0,
-  gamesPlayed: 0,
-  // Add these for full compatibility:
-  score: rating,                    // <— Add this
-  voteCount: movie.voteCount || 1000,
-  release_date: movie.release_date || '2000-01-01'
-};
-
-
-// If movie has genreIds property but not genre_ids, copy it over
-if (movie.genreIds && !movie.genre_ids) {
-  ratedMovie.genre_ids = movie.genreIds;
-}
-// If movie has neither, set an empty array
-if (!ratedMovie.genre_ids && !ratedMovie.genreIds) {
-  ratedMovie.genre_ids = [];
-}
-    
-    // Update rated movies
-    // Fetch full metadata before saving
-const response = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}?api_key=${API_KEY}&language=en-US`);
-const fullMovie = await response.json();
-const enrichedMovie = {
-  ...fullMovie,
-  poster_path: fullMovie.poster_path || movie.poster, // fix missing posters
-  genre_ids: fullMovie.genres?.map(g => g.id) || movie.genre_ids || movie.genre_Ids || [],
-  userRating: rating,
-  eloRating: rating * 10,
-  comparisonHistory: [],
-  comparisonWins: 0,
-  gamesPlayed: 0
-};
-
-// Update rated movies and persist
-const updatedRatedMovies = [...ratedMovies.filter(m => m.id !== movie.id), enrichedMovie];
-setRatedMovies(updatedRatedMovies);
-
-// Add to global seen list
-onAddToSeen(enrichedMovie);
-
-    
-    // Complete after 5 ratings instead of 3
-    if (updatedRatedMovies.length >= 5) {
-      handleComplete();
-      return;
-    }
-    
-    // Get the next movie
-    const nextMovie = getNextMovie();
-    if (nextMovie) {
-      setCurrentMovieIndex(prev => prev + 1);
-    } else if (updatedRatedMovies.length >= 3) {
-      // If we've rated at least 3 movies and no more are available, complete
-      handleComplete();
-    } else {
-      // If we need more ratings but have no more movies, show alert
-      setAllMoviesSkipped(true);
-    }
-  }, [getNextMovie, ratedMovies, onAddToSeen, handleComplete]);
-
-  // Handle skipping a movie
-  const handleSkipMovie = useCallback((movie) => {
-    // Add to skipped movies
-    setSkippedMovies(prev => [...prev, movie.id]);
-    
-    // Get the next movie
-    const nextMovie = getNextMovie();
-    if (nextMovie) {
-      setCurrentMovieIndex(prev => prev + 1);
-    } else if (ratedMovies.length >= 3) {
-      // If we've rated enough movies, we can proceed
-      handleComplete();
-    } else {
-      // If we need more ratings but have no more movies, show alert
-      setAllMoviesSkipped(true);
-    }
-  }, [getNextMovie, ratedMovies.length, handleComplete]);
-
-  // Handle completing the onboarding process
-  const handleComplete = useCallback(() => {
-  // Mark onboarding as complete
-  AsyncStorage.setItem(ONBOARDING_COMPLETE_KEY, 'true')
-    .then(() => onComplete())
-    .catch(error => {
-      console.error('Failed to save onboarding state:', error);
-      onComplete(); // Continue anyway
-    });
-}, [onComplete]);
-
-  // Next slide in welcome section
-  const goToNextSlide = useCallback(() => {
-  if (welcomeIndex < welcomeSlides.length - 1) {
-    setWelcomeIndex(welcomeIndex + 1);
-  } else {
-    setStep('genres');
-  }
-}, [welcomeIndex, welcomeSlides.length]);
-
-  // Skip to genre selection
-  const goToGenres = useCallback(() => {
-    setStep('genres');
   }, []);
 
-  // Skip onboarding entirely
-  const skipOnboarding = useCallback(() => {
-    // Mark onboarding as complete and proceed
-    AsyncStorage.setItem(ONBOARDING_COMPLETE_KEY, 'true')
-      .then(() => onComplete())
-      .catch(error => {
-        console.error('Failed to save onboarding state:', error);
-        onComplete(); // Continue anyway
-      });
-  }, [onComplete]);
+  // Navigation between steps
+  const nextStep = useCallback(() => {
+    if (currentStep === 1 && selectedMovies.length === 10) {
+      setCurrentStep(2);
+    } else if (currentStep === 2 && selectedStreamingServices.length > 0) {
+      setCurrentStep(3);
+      completeOnboarding();
+    }
+  }, [currentStep, selectedMovies.length, selectedStreamingServices.length]);
 
-  // Skip all remaining movies and complete onboarding with current ratings
-  const skipRemainingMovies = useCallback(() => {
-  if (ratedMovies.length >= 3) {
-    handleComplete();
-  } else {
-    // Alert the user that they need to rate at least 3 movies
-    Alert.alert(
-      "More Ratings Needed",
-      `Please rate at least 3 movies. You've rated ${ratedMovies.length} so far.`,
-      [{ text: "OK" }]
-    );
-  }
-}, [ratedMovies.length, handleComplete]);
+  const prevStep = useCallback(() => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  }, [currentStep]);
 
-  // Current movie to display
-const currentMovie = useMemo(() => getNextMovie(), [getNextMovie]);
-
-  // Render welcome slide
-  const renderWelcomeSlide = () => {
-    const slide = welcomeSlides[welcomeIndex];
+  // Complete onboarding process with robust error handling
+  const completeOnboarding = useCallback(async () => {
+    setLoading(true);
+    setCriticalError(null);
     
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: isDarkMode ? '#1C2526' : '#FFFFFF' }]}>
-        <View style={styles.slideContent}>
-          <View style={[
-            styles.iconContainer, 
-            { backgroundColor: isDarkMode ? '#4B0082' : '#F0F0F0' }
-          ]}>
-            <Ionicons
-              name={slide.icon}
-              size={80}
-              color={isDarkMode ? '#FFD700' : '#4B0082'}
-            />
-          </View>
-          
-          <Text style={[
-            styles.title, 
-            { color: isDarkMode ? '#FFFFFF' : '#333333' }
-          ]}>
-            {slide.title}
-          </Text>
-          
-          <Text style={[
-            styles.description, 
-            { color: isDarkMode ? '#D3D3D3' : '#666666' }
-          ]}>
-            {slide.description}
-          </Text>
-        </View>
-        
-        {/* Pagination dots */}
-        <View style={styles.pagination}>
-          {welcomeSlides.map((_, index) => (
-            <View
-              key={index}
-              style={[
-                styles.paginationDot,
-                index === welcomeIndex ? 
-                  { backgroundColor: isDarkMode ? '#FFD700' : '#4B0082', width: 20 } : 
-                  { backgroundColor: isDarkMode ? '#444444' : '#CCCCCC', width: 10 }
-              ]}
-            />
-          ))}
-        </View>
-        
-        {/* Navigation buttons */}
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[
-              styles.button,
-              { backgroundColor: isDarkMode ? '#FFD700' : '#4B0082' }
-            ]}
-            onPress={goToNextSlide}
-          >
-            <Text style={[
-              styles.buttonText,
-              { color: isDarkMode ? '#1C2526' : '#FFFFFF' }
-            ]}>
-              Next
-            </Text>
-            <Ionicons
-              name="arrow-forward"
-              size={20}
-              color={isDarkMode ? '#1C2526' : '#FFFFFF'}
-              style={{ marginLeft: 5 }}
-            />
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={styles.skipButton}
-            onPress={goToGenres}
-          >
-            <Text style={[
-              styles.skipButtonText,
-              { color: isDarkMode ? '#D3D3D3' : '#666666' }
-            ]}>
-              Skip
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  };
-
-  // Render genre selection screen
-  const renderGenreSelection = () => {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: isDarkMode ? '#1C2526' : '#FFFFFF' }]}>
-        <View style={styles.slideContent}>
-          <View style={[
-            styles.iconContainer, 
-            { backgroundColor: isDarkMode ? '#4B0082' : '#F0F0F0' }
-          ]}>
-            <Ionicons
-              name="film-outline"
-              size={80}
-              color={isDarkMode ? '#FFD700' : '#4B0082'}
-            />
-          </View>
-          
-          <Text style={[
-            styles.title, 
-            { color: isDarkMode ? '#FFFFFF' : '#333333' }
-          ]}>
-            Select Your Favorite Genres
-          </Text>
-          
-          <Text style={[
-            styles.description, 
-            { color: isDarkMode ? '#D3D3D3' : '#666666' }
-          ]}>
-            Choose up to 3 genres you enjoy the most. This helps us show you more relevant movies.
-          </Text>
-          
-          <Text style={[
-            styles.genreCounter,
-            { color: isDarkMode ? '#FFD700' : '#4B0082' }
-          ]}>
-            {selectedGenres.length}/3 Selected
-          </Text>
-          
-          <View style={styles.genreGrid}>
-            {popularGenres.map(genre => (
-              <TouchableOpacity
-                key={genre.id}
-                style={[
-                  styles.genreButton,
-                  selectedGenres.includes(genre.id) && 
-                    { backgroundColor: isDarkMode ? '#8A2BE2' : '#4B0082' },
-                  { borderColor: isDarkMode ? '#8A2BE2' : '#4B0082' }
-                ]}
-                onPress={() => toggleGenre(genre.id)}
-                disabled={selectedGenres.length >= 3 && !selectedGenres.includes(genre.id)}
-              >
-                <Text style={[
-                  styles.genreText,
-                  selectedGenres.includes(genre.id) ?
-                    { color: '#FFFFFF' } :
-                    { color: isDarkMode ? '#D3D3D3' : '#666666' }
-                ]}>
-                  {genre.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          
-          <TouchableOpacity
-            style={[
-              styles.button,
-              { backgroundColor: isDarkMode ? '#FFD700' : '#4B0082', marginTop: 20 }
-            ]}
-            onPress={goToMovieRating}
-          >
-            <Text style={[
-              styles.buttonText,
-              { color: isDarkMode ? '#1C2526' : '#FFFFFF' }
-            ]}>
-              {selectedGenres.length > 0 ? 'Continue' : 'Skip Genre Selection'}
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={styles.skipButton}
-            onPress={skipOnboarding}
-          >
-            <Text style={[
-              styles.skipButtonText,
-              { color: isDarkMode ? '#D3D3D3' : '#666666' }
-            ]}>
-              Skip Onboarding
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  };
-
-  // Render movie rating screen
-  const renderMovieRating = () => {
-    // Check if we have enough rated movies to proceed
-    const ratedCount = ratedMovies.length;
-    const canProceed = ratedCount >= 3;
-    const requiredCount = 5;
-    
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: isDarkMode ? '#1C2526' : '#FFFFFF' }]}>
-        <View style={styles.movieRatingContent}>
-          <Text style={[
-            styles.title, 
-            { color: isDarkMode ? '#FFFFFF' : '#333333' }
-          ]}>
-            Rate Movies
-          </Text>
-          
-          <Text style={[
-            styles.description, 
-            { color: isDarkMode ? '#D3D3D3' : '#666666', marginBottom: 20 }
-          ]}>
-            Rate {requiredCount} movies to jump-start your recommendations.
-            {ratedCount > 0 ? ` (${ratedCount}/${requiredCount} rated)` : ''}
-          </Text>
-          
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={isDarkMode ? '#FFD700' : '#4B0082'} />
-              <Text style={[
-                styles.loadingText, 
-                { color: isDarkMode ? '#D3D3D3' : '#666666' }
-              ]}>
-                Loading movies based on your genres...
-              </Text>
-            </View>
-          ) : allMoviesSkipped ? (
-            <View style={styles.allSkippedContainer}>
-              <Ionicons 
-                name="alert-circle-outline" 
-                size={64} 
-                color={isDarkMode ? '#FFD700' : '#4B0082'} 
-              />
-              <Text style={[
-                styles.allSkippedText,
-                { color: isDarkMode ? '#FFFFFF' : '#333333' }
-              ]}>
-                You've skipped all available movies!
-              </Text>
-              <Text style={[
-                styles.allSkippedSubtext,
-                { color: isDarkMode ? '#D3D3D3' : '#666666' }
-              ]}>
-                {ratedCount >= 3 
-                  ? "Don't worry, you've rated enough movies to continue."
-                  : `Please rate at least 3 movies to continue. You've rated ${ratedCount} so far.`}
-              </Text>
-              
-              {canProceed && (
-                <TouchableOpacity
-                  style={[
-                    styles.continueButton,
-                    { backgroundColor: isDarkMode ? '#FFD700' : '#4B0082' }
-                  ]}
-                  onPress={handleComplete}
-                >
-                  <Text style={[
-                    styles.continueButtonText,
-                    { color: isDarkMode ? '#1C2526' : '#FFFFFF' }
-                  ]}>
-                    I'm Done Rating
-                  </Text>
-                </TouchableOpacity>
-              )}
-              
-              {/* Skip all remaining movies button */}
-              {ratedCount > 0 && (
-                <TouchableOpacity
-                  style={[
-                    styles.skipAllButton,
-                    { borderColor: isDarkMode ? '#8A2BE2' : '#4B0082' }
-                  ]}
-                  onPress={skipRemainingMovies}
-                >
-                  <Text style={[
-                    styles.skipAllButtonText,
-                    { color: isDarkMode ? '#D3D3D3' : '#666666' }
-                  ]}>
-                    {canProceed ? "Skip to App" : "I Don't Know Any More Movies"}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-         ) : currentMovie ? (
-  <View style={styles.singleMovieContainer}>
-    <View 
-      style={[
-        styles.movieCard,
-        { backgroundColor: isDarkMode ? '#2A2A2A' : '#F5F5F5' }
-      ]}
-    >
-      <Image 
-        source={{ uri: `https://image.tmdb.org/t/p/w342${currentMovie.poster}` }}
-        style={styles.singleMoviePoster}
-        resizeMode="cover"
-      />
+    try {
+      // Pre-validation
+      if (!selectedMovies || selectedMovies.length < 5) {
+        throw new Error('Must select at least 5 movies to continue');
+      }
       
-      <View style={styles.movieDetails}>
-  <Text 
-    style={[
-      styles.movieTitle,
-      { color: isDarkMode ? '#FFFFFF' : '#333333' }
-    ]}
-    numberOfLines={2}
-    ellipsizeMode="tail"
-  >
-    {currentMovie.title}
-  </Text>
-  
-  <Text 
-    style={[
-      styles.movieScore,
-      { color: isDarkMode ? '#FFD700' : '#4B0082' }
-    ]}
-  >
-    TMDb: {currentMovie.score.toFixed(1)}
-  </Text>
-  
-  {/* "Haven't seen it" button moved above the rating buttons */}
-  <TouchableOpacity
-    style={[
-      styles.skipMovieButton,
-      { 
-        marginBottom: 12,
-        marginTop: 4,
-        backgroundColor: isDarkMode ? 'rgba(75, 0, 130, 0.2)' : 'rgba(240, 240, 240, 0.8)',
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: isDarkMode ? '#8A2BE2' : '#E0E0E0'
+      if (!selectedStreamingServices || selectedStreamingServices.length === 0) {
+        throw new Error('Must select at least one streaming service');
       }
-    ]}
-    onPress={() => handleSkipMovie(currentMovie)}
-  >
-    <Text style={[
-      styles.skipMovieText,
-      { 
-        color: isDarkMode ? '#D3D3D3' : '#666666',
-        fontWeight: '500'
+
+      // Sanitize and validate data
+      const sanitizedMovies = selectedMovies.map(movie => ({
+        id: movie.id,
+        title: movie.title || 'Unknown Title',
+        poster_path: movie.poster_path || null
+      }));
+
+      const userPreferences = {
+        favoriteMovies: sanitizedMovies,
+        streamingServices: selectedStreamingServices,
+        onboardingCompletedAt: new Date().toISOString(),
+        version: '2.0',
+        imageErrors: Array.from(imageLoadErrors)
+      };
+
+      // Atomic storage operation with verification
+      const preferencesKey = 'wuvo_user_preferences';
+      
+      await Promise.all([
+        AsyncStorage.setItem(preferencesKey, JSON.stringify(userPreferences)),
+        AsyncStorage.setItem(ONBOARDING_COMPLETE_KEY, 'true')
+      ]);
+
+      // Verify data was saved correctly
+      const [savedPrefs, savedComplete] = await Promise.all([
+        AsyncStorage.getItem(preferencesKey),
+        AsyncStorage.getItem(ONBOARDING_COMPLETE_KEY)
+      ]);
+      
+      if (!savedPrefs || !savedComplete) {
+        throw new Error('Data verification failed after save');
       }
-    ]}>
-      Haven't seen it
-    </Text>
-  </TouchableOpacity>
-  
-  <View style={styles.ratingButtons}>
-    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(rating => (
+
+      // Parse to ensure data integrity
+      const parsedPrefs = JSON.parse(savedPrefs);
+      if (!parsedPrefs.favoriteMovies || parsedPrefs.favoriteMovies.length === 0) {
+        throw new Error('Saved data corrupted during storage');
+      }
+
+      console.log('Onboarding completed successfully:', {
+        movies: parsedPrefs.favoriteMovies.length,
+        services: parsedPrefs.streamingServices.length,
+        errors: parsedPrefs.imageErrors.length
+      });
+
+      // Success delay for UX
+      setTimeout(() => {
+        setLoading(false);
+        onComplete();
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Onboarding completion error:', error);
+      setLoading(false);
+      setCriticalError(error.message);
+      
+      // User-friendly error messaging with retry options
+      let errorTitle = 'Setup Failed';
+      let errorMessage = 'Failed to save your preferences. Please try again.';
+      
+      if (error.message.includes('Must select')) {
+        errorTitle = 'Selection Required';
+        errorMessage = error.message;
+      } else if (error.message.includes('storage') || error.message.includes('quota')) {
+        errorTitle = 'Storage Error';
+        errorMessage = 'Device storage full. Please free up space and try again.';
+      } else if (error.message.includes('verification') || error.message.includes('corrupted')) {
+        errorTitle = 'Data Error';
+        errorMessage = 'Setup verification failed. Please check your device and try again.';
+      } else if (error.message.includes('network') || error.message.includes('timeout')) {
+        errorTitle = 'Network Error';
+        errorMessage = 'Connection issue. Please check your internet and try again.';
+      }
+      
+      Alert.alert(errorTitle, errorMessage, [
+        { text: 'Retry', onPress: completeOnboarding },
+        { text: 'Cancel', style: 'cancel' }
+      ]);
+    }
+  }, [selectedMovies, selectedStreamingServices, onComplete, imageLoadErrors]);
+
+  // Get poster URL with error handling
+  const getPosterUrl = useCallback((posterPath) => {
+    try {
+      return posterPath 
+        ? `https://image.tmdb.org/t/p/w342${posterPath}`
+        : 'https://via.placeholder.com/342x513/333/fff?text=No+Poster';
+    } catch (error) {
+      console.error('Error generating poster URL:', error);
+      return 'https://via.placeholder.com/342x513/333/fff?text=Error';
+    }
+  }, []);
+
+  // Handle image loading errors
+  const handleImageError = useCallback((movieId, error) => {
+    console.warn(`Image load failed for movie ID: ${movieId}`, error);
+    setImageLoadErrors(prev => new Set([...prev, movieId]));
+  }, []);
+
+  // Render movie item with error handling
+  const renderMovieItem = useCallback(({ item: movie }) => {
+    const isSelected = selectedMovies.some(m => m.id === movie.id);
+    const hasImageError = imageLoadErrors.has(movie.id);
+    
+    return (
       <TouchableOpacity
-        key={rating}
-        style={[
-          styles.ratingButton,
-          { backgroundColor: isDarkMode ? '#4B0082' : '#F0F0F0' }
-        ]}
-        onPress={() => handleRateMovie(currentMovie, rating)}
+        style={[styles.movieItem, isSelected && styles.selectedMovieItem]}
+        onPress={() => toggleMovieSelection(movie)}
+        activeOpacity={0.7}
       >
-        <Text style={[
-          styles.ratingText,
-          { color: isDarkMode ? '#FFFFFF' : '#4B0082' }
-        ]}>
-          {rating}
+        {hasImageError ? (
+          <View style={[styles.moviePoster, styles.errorPoster]}>
+            <Ionicons name="film-outline" size={40} color="#666" />
+            <Text style={styles.errorText}>Image Failed</Text>
+          </View>
+        ) : (
+          <Image
+            source={{ uri: getPosterUrl(movie.poster_path) }}
+            style={styles.moviePoster}
+            resizeMode="cover"
+            onError={(error) => handleImageError(movie.id, error)}
+            onLoadStart={() => console.log(`Loading image for ${movie.title}`)}
+          />
+        )}
+        {isSelected && (
+          <View style={styles.selectedOverlay}>
+            <Ionicons name="checkmark-circle" size={24} color="#FFD700" />
+          </View>
+        )}
+        <Text style={styles.movieTitle} numberOfLines={2}>
+          {movie.title}
         </Text>
       </TouchableOpacity>
-    ))}
-  </View>
-</View>
-    </View>
+    );
+  }, [selectedMovies, toggleMovieSelection, getPosterUrl, imageLoadErrors, handleImageError]);
+
+  // Render streaming service item
+  const renderStreamingItem = useCallback(({ item: service }) => {
+    const isSelected = selectedStreamingServices.includes(service.id);
     
-    {/* Progress indicator */}
-    <View style={styles.progressContainer}>
-      <Text style={[
-        styles.progressText,
-        { color: isDarkMode ? '#D3D3D3' : '#666666' }
-      ]}>
-        Movies Rated: {ratedCount}/{requiredCount}
+    return (
+      <TouchableOpacity
+        style={[styles.streamingItem, isSelected && styles.selectedStreamingItem]}
+        onPress={() => toggleStreamingService(service.id)}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.streamingIconContainer, { backgroundColor: service.brandColor }]}>
+          <MaterialCommunityIcons 
+            name={service.icon} 
+            size={32} 
+            color="#FFFFFF"
+            onError={() => console.warn(`Icon ${service.icon} failed to load`)}
+          />
+          <Text style={styles.fallbackText}>{service.fallbackText}</Text>
+        </View>
+        <Text style={styles.streamingName}>{service.name}</Text>
+        {isSelected && (
+          <View style={styles.streamingCheckmark}>
+            <Ionicons name="checkmark-circle" size={20} color="#FFD700" />
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  }, [selectedStreamingServices, toggleStreamingService]);
+
+  // Render step 1: Movie selection
+  const renderMovieSelection = () => (
+    <View style={styles.stepContainer}>
+      <Text style={styles.stepTitle}>Pick Your Top 10 Favorite Movies</Text>
+      <Text style={styles.stepSubtitle}>
+        Help us understand your taste ({selectedMovies.length}/10 selected)
       </Text>
-      <View style={[
-        styles.progressBar,
-        { backgroundColor: isDarkMode ? '#333333' : '#E0E0E0' }
-      ]}>
-        <View 
-          style={[
-            styles.progressFill,
-            { 
-              backgroundColor: isDarkMode ? '#FFD700' : '#4B0082',
-              width: `${Math.min(100, (ratedCount / requiredCount) * 100)}%`
-            }
-          ]} 
-        />
+      
+      <FlatList
+        data={POPULAR_MOVIES}
+        renderItem={renderMovieItem}
+        keyExtractor={(item) => item.id.toString()}
+        numColumns={3}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.moviesGrid}
+        columnWrapperStyle={styles.movieRow}
+      />
+
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={[styles.nextButton, selectedMovies.length !== 10 && styles.disabledButton]}
+          onPress={nextStep}
+          disabled={selectedMovies.length !== 10}
+        >
+          <Text style={styles.nextButtonText}>
+            {selectedMovies.length === 10 ? 'Continue' : `Select ${10 - selectedMovies.length} more`}
+          </Text>
+          <Ionicons name="arrow-forward" size={20} color="#1C2526" />
+        </TouchableOpacity>
       </View>
     </View>
-    
-    {canProceed && (
-      <TouchableOpacity
-        style={[
-          styles.completeButton,
-          { backgroundColor: isDarkMode ? '#FFD700' : '#4B0082' }
-        ]}
-        onPress={handleComplete}
-      >
-        <Text style={[
-          styles.completeButtonText,
-          { color: isDarkMode ? '#1C2526' : '#FFFFFF' }
-        ]}>
-          I'm Done Rating
-        </Text>
-      </TouchableOpacity>
-    )}
-    
-    {/* Skip all remaining movies button */}
-    {ratedCount > 0 && (
-      <TouchableOpacity
-        style={[
-          styles.skipAllButton,
-          { borderColor: isDarkMode ? '#8A2BE2' : '#4B0082' }
-        ]}
-        onPress={skipRemainingMovies}
-      >
-        <Text style={[
-          styles.skipAllButtonText,
-          { color: isDarkMode ? '#D3D3D3' : '#666666' }
-        ]}>
-          {canProceed ? "Skip to App" : "I Don't Know Any More Movies"}
-        </Text>
-      </TouchableOpacity>
-    )}
-  </View>
-) : (
-  <View style={styles.noMoviesContainer}>
-    <Ionicons 
-      name="film-outline" 
-      size={64} 
-      color={isDarkMode ? '#FFD700' : '#4B0082'} 
-    />
-    <Text style={[
-      styles.noMoviesText,
-      { color: isDarkMode ? '#FFFFFF' : '#333333' }
-    ]}>
-      No more movies to rate
-    </Text>
-    <TouchableOpacity
-      style={[
-        styles.tryAgainButton,
-        { backgroundColor: isDarkMode ? '#FFD700' : '#4B0082' }
-      ]}
-      onPress={goToMovieRating}
-    >
-      <Text style={[
-        styles.tryAgainButtonText,
-        { color: isDarkMode ? '#1C2526' : '#FFFFFF' }
-      ]}>
-        Try Different Genres
-      </Text>
-    </TouchableOpacity>
-    
-    {canProceed && (
-      <TouchableOpacity
-        style={[
-          styles.completeButton,
-          { backgroundColor: isDarkMode ? '#8A2BE2' : '#4B0082', marginTop: 10 }
-        ]}
-        onPress={handleComplete}
-      >
-        <Text style={[
-          styles.completeButtonText,
-          { color: '#FFFFFF' }
-        ]}>
-          Continue to App
-        </Text>
-      </TouchableOpacity>
-    )}
-  </View>
-          )}
-        </View>
-      </SafeAreaView>
-    );
-  };
+  );
 
-  // Render the appropriate screen based on current step
-  switch (step) {
-    case 'welcome':
-      return renderWelcomeSlide();
-    case 'genres':
-      return renderGenreSelection();
-    case 'movies':
-      return renderMovieRating();
-    default:
-      return renderWelcomeSlide();
-  }
+  // Render step 2: Streaming services
+  const renderStreamingSelection = () => (
+    <View style={styles.stepContainer}>
+      <Text style={styles.stepTitle}>What Streaming Services Do You Have?</Text>
+      <Text style={styles.stepSubtitle}>
+        We'll recommend content you can actually watch ({selectedStreamingServices.length} selected)
+      </Text>
+      
+      <FlatList
+        data={STREAMING_SERVICES}
+        renderItem={renderStreamingItem}
+        keyExtractor={(item) => item.id.toString()}
+        numColumns={2}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.streamingGrid}
+        columnWrapperStyle={styles.streamingRow}
+      />
+
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity style={styles.backButton} onPress={prevStep}>
+          <Ionicons name="arrow-back" size={20} color="#FFD700" />
+          <Text style={styles.backButtonText}>Back</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.nextButton, selectedStreamingServices.length === 0 && styles.disabledButton]}
+          onPress={nextStep}
+          disabled={selectedStreamingServices.length === 0}
+        >
+          <Text style={styles.nextButtonText}>
+            {selectedStreamingServices.length > 0 ? 'Complete Setup' : 'Select at least one'}
+          </Text>
+          <Ionicons name="checkmark" size={20} color="#1C2526" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  // Render step 3: Completion
+  const renderCompletion = () => (
+    <View style={styles.completionContainer}>
+      <View style={styles.completionContent}>
+        <Ionicons name="checkmark-circle" size={80} color="#FFD700" />
+        <Text style={styles.completionTitle}>You're All Set!</Text>
+        <Text style={styles.completionSubtitle}>
+          Creating your personalized movie experience...
+        </Text>
+        <ActivityIndicator size="large" color="#FFD700" style={styles.loader} />
+      </View>
+    </View>
+  );
+
+  // Create styles with current theme
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <LinearGradient
+        colors={isDark ? ['#1C2526', '#4B0082'] : ['#F8F9FA', '#E9ECEF']}
+        style={styles.gradient}
+      >
+        {/* Progress indicator */}
+        <View style={styles.progressContainer}>
+          <View style={styles.progressBar}>
+            <View 
+              style={[
+                styles.progressFill, 
+                { width: `${(currentStep / 3) * 100}%` }
+              ]} 
+            />
+          </View>
+          <Text style={styles.progressText}>Step {currentStep} of 3</Text>
+        </View>
+
+        {/* Content */}
+        {currentStep === 1 && renderMovieSelection()}
+        {currentStep === 2 && renderStreamingSelection()}
+        {currentStep === 3 && renderCompletion()}
+      </LinearGradient>
+    </SafeAreaView>
+  );
 };
 
-const styles = StyleSheet.create({
+// Create themed styles function
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: theme.BACKGROUND.PRIMARY,
   },
-  slideContent: {
+  gradient: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
   },
-  movieRatingContent: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 40,
-  },
-  iconContainer: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 30,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  description: {
-    fontSize: 16,
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 30,
-  },
-  pagination: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  paginationDot: {
-    height: 10,
-    borderRadius: 5,
-    marginHorizontal: 5,
-  },
-  buttonContainer: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 40,
-    paddingHorizontal: 20,
-  },
-  button: {
-    flexDirection: 'row',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-    marginBottom: 15,
-    minWidth: 200,
-  },
-  buttonText: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  skipButton: {
-    padding: 10,
-  },
-  skipButtonText: {
-    fontSize: 16,
-  },
-  // Genre selection styles
-  genreCounter: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 15,
-  },
-  genreGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    width: '100%',
-  },
-  genreButton: {
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    margin: 6,
-  },
-  genreText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  // Movie rating styles
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    marginTop: 15,
-    fontSize: 16,
-  },
-  singleMovieContainer: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  movieCard: {
-    borderRadius: 16,
-    padding: 16,
-    width: '100%',
-    marginBottom: 20,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  singleMoviePoster: {
-    width: 200,
-    height: 300,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  movieDetails: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  movieTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    textAlign: 'center',
-    maxWidth: '100%',
-    height: 60, // Fixed height for title to prevent layout shifts
-    textAlignVertical: 'center',
-  },
-  movieScore: {
-    fontSize: 18,
-    marginBottom: 20,
-  },
-  skipMovieButton: {
-    marginTop: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-  },
-  skipMovieText: {
-    fontSize: 16,
-    fontStyle: 'italic',
-  },
-ratingButtons: {
-  flexDirection: 'row',
-  flexWrap: 'wrap',
-  justifyContent: 'space-between',  // Changed from 'space-around' for better distribution
-  marginTop: 10,
-  paddingHorizontal: 10,            // Add padding to prevent touching edges
-  width: '100%',                    // Ensure full width
-},
-ratingButton: {
-  width: '18%',                     // Keep 5 buttons per row
-  minWidth: 45,                     // Minimum width for smaller screens
-  aspectRatio: 1,                   // Keeps square shape
-  justifyContent: 'center',
-  alignItems: 'center',
-  borderRadius: 999,                // Full circle
-  marginVertical: 10,               // Increased from 8 for more spacing
-},
-ratingText: {
-  fontSize: 18,                     // Increased from 14 for better visibility
-  fontWeight: '700',                // Increased from '600' for bolder text
-},
   progressContainer: {
-    width: '100%',
-    marginTop: 10,
-    marginBottom: 20,
-  },
-  progressText: {
-    fontSize: 16,
-    marginBottom: 8,
-    textAlign: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 10,
   },
   progressBar: {
-    height: 10,
-    borderRadius: 5,
-    width: '100%',
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 2,
+    marginBottom: 8,
   },
   progressFill: {
     height: '100%',
-    borderRadius: 5,
+    backgroundColor: '#FFD700',
+    borderRadius: 2,
   },
-  noMoviesContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  noMoviesText: {
-    fontSize: 20,
-    marginVertical: 16,
+  progressText: {
+    color: theme.TEXT.PRIMARY,
+    fontSize: 14,
     textAlign: 'center',
   },
-  tryAgainButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 30,
-    marginTop: 20,
-  },
-  tryAgainButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  allSkippedContainer: {
+  stepContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
     padding: 20,
   },
-  allSkippedText: {
-    fontSize: 20,
+  stepTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
-    marginTop: 16,
+    color: theme.TEXT.PRIMARY,
+    textAlign: 'center',
     marginBottom: 8,
-    textAlign: 'center',
   },
-  allSkippedSubtext: {
+  stepSubtitle: {
     fontSize: 16,
+    color: theme.TEXT.SECONDARY,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 30,
   },
-  continueButton: {
+  moviesGrid: {
+    paddingBottom: 20,
+  },
+  movieRow: {
+    justifyContent: 'space-around',
+    marginBottom: 20,
+  },
+  movieItem: {
+    width: (width - 80) / 3,
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  selectedMovieItem: {
+    borderColor: '#FFD700',
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+  },
+  moviePoster: {
+    width: '100%',
+    height: 120,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  selectedOverlay: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 12,
+    padding: 2,
+  },
+  movieTitle: {
+    color: theme.TEXT.PRIMARY,
+    fontSize: 12,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  streamingGrid: {
+    paddingBottom: 20,
+  },
+  streamingRow: {
+    justifyContent: 'space-around',
+    marginBottom: 20,
+  },
+  streamingItem: {
+    width: (width - 80) / 2,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  selectedStreamingItem: {
+    borderColor: '#FFD700',
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+  },
+  streamingIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  fallbackText: {
+    position: 'absolute',
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  streamingIcon: {
+    fontSize: 32,
+  },
+  streamingName: {
+    color: theme.TEXT.PRIMARY,
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  streamingCheckmark: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 20,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 30,
-    marginTop: 10,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: '#FFD700',
   },
-  continueButtonText: {
+  backButtonText: {
+    color: '#FFD700',
     fontSize: 16,
     fontWeight: '600',
+    marginLeft: 8,
   },
-  completeButton: {
-    width: '100%',
-    paddingVertical: 15,
-    borderRadius: 30,
+  nextButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 16,
-  },
-  completeButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  skipAllButton: {
-    width: '100%',
     paddingVertical: 12,
-    borderRadius: 30,
-    alignItems: 'center',
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    backgroundColor: '#FFD700',
+    flex: 1,
     justifyContent: 'center',
-    borderWidth: 1,
-    marginTop: 12,
+    marginLeft: 12,
   },
-  skipAllButtonText: {
-    fontSize: 14,
-  }
+  disabledButton: {
+    backgroundColor: 'rgba(255, 215, 0, 0.3)',
+  },
+  nextButtonText: {
+    color: '#1C2526',
+    fontSize: 16,
+    fontWeight: '600',
+    marginRight: 8,
+  },
+  completionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  completionContent: {
+    alignItems: 'center',
+  },
+  completionTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: theme.TEXT.PRIMARY,
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  completionSubtitle: {
+    fontSize: 16,
+    color: theme.TEXT.SECONDARY,
+    textAlign: 'center',
+    marginBottom: 30,
+  },
+  loader: {
+    marginTop: 20,
+  },
+  errorPoster: {
+    backgroundColor: '#333',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  errorText: {
+    color: '#999',
+    fontSize: 10,
+    marginTop: 4,
+    textAlign: 'center',
+  },
 });
 
-export default OnboardingScreen;
+// Export with theme
+const ThemedOnboardingScreen = (props) => {
+  return <OnboardingScreen {...props} />;
+};
+
+export default ThemedOnboardingScreen;
