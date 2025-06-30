@@ -1944,13 +1944,7 @@ function HomeScreen({
                   ]}
                   pointerEvents={showSentimentButtons ? 'none' : 'auto'}
                 >
-                  <TouchableOpacity 
-                    style={[modalStyles.actionButton, { flex: 1, marginHorizontal: 2 }]}
-                    onPress={openRatingModal}
-                  >
-                    <Text style={modalStyles.actionButtonText}>Quick Rate</Text>
-                  </TouchableOpacity>
-                  
+                  {/* Rate Button with State Management */}
                   <TouchableOpacity 
                     style={[modalStyles.actionButton, { flex: 1, marginHorizontal: 2, backgroundColor: colors.accent }]}
                     onPress={() => {
@@ -1959,23 +1953,44 @@ function HomeScreen({
                       setMovieDetailModalVisible(false);
                     }}
                   >
-                    <Text style={[modalStyles.actionButtonText, { color: '#FFF' }]}>Smart Rate</Text>
+                    <Text 
+                      style={[modalStyles.actionButtonText, { color: '#FFF' }]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      adjustsFontSizeToFit={true}
+                    >
+                      {seen.some(movie => movie.id === selectedMovie?.id) ? 'Re-rate' : 'Rate'}
+                    </Text>
                   </TouchableOpacity>
                   
+                  {/* Watchlist Button with Clear Text */}
                   <TouchableOpacity 
                     style={[modalStyles.actionButton, { flex: 1, marginHorizontal: 2 }]}
                     onPress={handleWatchlistToggle}
                   >
-                    <Text style={modalStyles.actionButtonText}>
-                      {unseen.some(movie => movie.id === selectedMovie?.id) ? 'Remove from Watchlist' : 'Watchlist'}
+                    <Text 
+                      style={modalStyles.actionButtonText}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      adjustsFontSizeToFit={true}
+                    >
+                      {unseen.some(movie => movie.id === selectedMovie?.id) ? 'Remove from Watchlist' : 'Add to Watchlist'}
                     </Text>
                   </TouchableOpacity>
                   
+                  {/* Not Interested Button with Overflow Protection */}
                   <TouchableOpacity 
-                    style={[modalStyles.actionButton, { flex: 1, marginHorizontal: 4 }]}
+                    style={[modalStyles.actionButton, { flex: 1, marginHorizontal: 2 }]}
                     onPress={handleNotInterested}
                   >
-                    <Text style={modalStyles.actionButtonText}>Not Interested</Text>
+                    <Text 
+                      style={modalStyles.actionButtonText}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      adjustsFontSizeToFit={true}
+                    >
+                      Not Interested
+                    </Text>
                   </TouchableOpacity>
                 </Animated.View>
                 
