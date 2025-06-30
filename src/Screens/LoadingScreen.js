@@ -115,8 +115,8 @@ const LoadingScreen = ({ onFinishLoading, isDarkMode = true }) => {
         }),
       ]),
       
-      // 4. Hold for a moment to appreciate the full animation
-      Animated.delay(1500),
+      // 4. Quick delay for Snack demo
+      Animated.delay(500),
       
       // 5. Fade everything out with staggered timing
       Animated.parallel([

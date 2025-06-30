@@ -26,8 +26,8 @@ import { useAsyncStorage } from './src/hooks/useAsyncStorage';
 // export { default } from './AppSimple';
 
 export default function App() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [appReady, setAppReady] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [appReady, setAppReady] = useState(false);
 
   // Custom hooks
   const { 
@@ -96,21 +96,19 @@ export default function App() {
     await handleLogout();
   }, [resetAllUserData, resetAllData, handleLogout]);
 
-  // Initial app setup
+  // Initial app setup - simplified for Snack
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        if (isDevModeEnabled()) {
-          console.log('🔧 DEV MODE: Skipping normal initialization');
-          setTimeout(() => {
-            setIsLoading(false);
-            setAppReady(true);
-          }, 500);
-          return;
-        }
-
-        setIsLoading(false);
-        setAppReady(true);
+        console.log('🚀 Initializing WUVO app...');
+        
+        // Short loading time for demo
+        setTimeout(() => {
+          console.log('✅ App initialization complete');
+          setIsLoading(false);
+          setAppReady(true);
+        }, 2000); // Reduced from long animation
+        
       } catch (e) {
         console.error('Initialization error:', e);
         setIsLoading(false);

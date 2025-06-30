@@ -3,7 +3,7 @@
 
 const DEV_CONFIG = {
   // Set to true to skip auth and onboarding during development
-  ENABLE_DEV_MODE: false,
+  ENABLE_DEV_MODE: true, // Enabled for Snack demo
   
   // Pre-selected movies that will be automatically added to seen list
   DEV_MOVIES: [
