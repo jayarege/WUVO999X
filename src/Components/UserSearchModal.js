@@ -14,8 +14,55 @@ import {
   Dimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { debounce } from 'lodash';
-import { searchUsers, getRecommendedUsers, followUser, unfollowUser, isFollowing } from '../services/FirebaseService';
+// Mock user data for Snack compatibility
+const mockUsers = [
+  { id: 'user1', displayName: 'Alice Cooper', username: 'alice_movie_fan', profilePicture: 'https://via.placeholder.com/50x50?text=AC', followerCount: 1250, ratingCount: 342, mutualFollowCount: 5 },
+  { id: 'user2', displayName: 'Bob Smith', username: 'bob_cinephile', profilePicture: 'https://via.placeholder.com/50x50?text=BS', followerCount: 890, ratingCount: 567, mutualFollowCount: 3 },
+  { id: 'user3', displayName: 'Carol Davis', username: 'carol_reviews', profilePicture: 'https://via.placeholder.com/50x50?text=CD', followerCount: 2100, ratingCount: 789, mutualFollowCount: 8 },
+  { id: 'user4', displayName: 'David Wilson', username: 'david_films', profilePicture: 'https://via.placeholder.com/50x50?text=DW', followerCount: 450, ratingCount: 234, mutualFollowCount: 2 },
+  { id: 'user5', displayName: 'Emma Johnson', username: 'emma_movie_buff', profilePicture: 'https://via.placeholder.com/50x50?text=EJ', followerCount: 1680, ratingCount: 456, mutualFollowCount: 7 }
+];
+
+// Mock Firebase service functions
+const searchUsers = async (query, limit = 20) => {
+  // Simulate search delay
+  await new Promise(resolve => setTimeout(resolve, 500));
+  return mockUsers.filter(user => 
+    user.displayName.toLowerCase().includes(query.toLowerCase()) ||
+    user.username.toLowerCase().includes(query.toLowerCase())
+  ).slice(0, limit);
+};
+
+const getRecommendedUsers = async (currentUserId, limit = 15) => {
+  await new Promise(resolve => setTimeout(resolve, 300));
+  return mockUsers.slice(0, Math.min(limit, mockUsers.length));
+};
+
+const followUser = async (currentUserId, targetUserId) => {
+  await new Promise(resolve => setTimeout(resolve, 200));
+  console.log(`User ${currentUserId} followed ${targetUserId}`);
+};
+
+const unfollowUser = async (currentUserId, targetUserId) => {
+  await new Promise(resolve => setTimeout(resolve, 200));
+  console.log(`User ${currentUserId} unfollowed ${targetUserId}`);
+};
+
+const isFollowing = async (currentUserId, targetUserId) => {
+  await new Promise(resolve => setTimeout(resolve, 100));
+  return Math.random() > 0.5; // Random follow status for demo
+};
+
+// Simple debounce function
+const debounce = (func, delay) => {
+  let timeoutId;
+  const debounced = (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func.apply(null, args), delay);
+  };
+  debounced.cancel = () => clearTimeout(timeoutId);
+  return debounced;
+};
 
 const { width, height } = Dimensions.get('window');
 
