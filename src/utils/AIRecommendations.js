@@ -1,4 +1,613 @@
 import { GROQ_API_KEY, TMDB_API_KEY } from '../Constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// =============================================================================
+// USER PREFERENCE SERVICE - Integrated into AIRecommendations
+// =============================================================================
+
+class UserPreferenceService {
+  constructor() {
+    this.cache = new Map();
+    this.preferenceKeys = {
+      NOT_INTERESTED: 'user_not_interested',
+      VIEWING_HISTORY: 'user_viewing_history', 
+      PREFERENCE_WEIGHTS: 'user_preference_weights',
+      DEMOGRAPHIC_PROFILE: 'user_demographic_profile',
+      INTERACTION_PATTERNS: 'user_interaction_patterns'
+    };
+  }
+
+  async addNotInterestedItem(item, reason = 'not_interested', mediaType = 'movie') {
+    try {
+      const notInterestedList = await this.getNotInterestedList(mediaType);
+      
+      const notInterestedItem = {
+        id: item.id,
+        title: item.title || item.name,
+        genre_ids: item.genre_ids || [],
+        vote_average: item.vote_average,
+        release_date: item.release_date || item.first_air_date,
+        reason: reason,
+        timestamp: new Date().toISOString(),
+        confidence: this.calculateReasonConfidence(reason)
+      };
+
+      const filteredList = notInterestedList.filter(existing => existing.id !== item.id);
+      filteredList.unshift(notInterestedItem);
+      const limitedList = filteredList.slice(0, 500);
+
+      await AsyncStorage.setItem(
+        `${this.preferenceKeys.NOT_INTERESTED}_${mediaType}`,
+        JSON.stringify(limitedList)
+      );
+
+      await this.updatePreferenceWeights(notInterestedItem, -1, mediaType);
+      console.log(`❌ Added to not interested: ${item.title || item.name} (${reason})`);
+      return true;
+    } catch (error) {
+      console.error('Error adding not interested item:', error);
+      return false;
+    }
+  }
+
+  async getNotInterestedList(mediaType = 'movie') {
+    try {
+      const stored = await AsyncStorage.getItem(`${this.preferenceKeys.NOT_INTERESTED}_${mediaType}`);
+      return stored ? JSON.parse(stored) : [];
+    } catch (error) {
+      console.error('Error getting not interested list:', error);
+      return [];
+    }
+  }
+
+  calculateReasonConfidence(reason) {
+    const confidenceMap = {
+      'not_interested': 0.9,
+      'wrong_genre': 0.8,
+      'too_old': 0.6,
+      'seen_before': 0.7,
+      'low_quality': 0.8,
+      'too_long': 0.5,
+      'too_short': 0.5
+    };
+    return confidenceMap[reason] || 0.5;
+  }
+
+  async updatePreferenceWeights(item, weight, mediaType = 'movie') {
+    try {
+      const weights = await this.getPreferenceWeights(mediaType);
+      
+      if (item.genre_ids && Array.isArray(item.genre_ids)) {
+        item.genre_ids.forEach(genreId => {
+          weights.genres[genreId] = (weights.genres[genreId] || 0) + weight;
+        });
+      }
+
+      if (item.release_date) {
+        const year = parseInt(item.release_date.substring(0, 4));
+        const decade = Math.floor(year / 10) * 10;
+        weights.decades[decade] = (weights.decades[decade] || 0) + weight;
+      }
+
+      if (item.vote_average) {
+        const qualityTier = this.getQualityTier(item.vote_average);
+        weights.quality[qualityTier] = (weights.quality[qualityTier] || 0) + weight;
+      }
+
+      weights.lastUpdated = new Date().toISOString();
+
+      await AsyncStorage.setItem(
+        `${this.preferenceKeys.PREFERENCE_WEIGHTS}_${mediaType}`,
+        JSON.stringify(weights)
+      );
+
+      return weights;
+    } catch (error) {
+      console.error('Error updating preference weights:', error);
+      return null;
+    }
+  }
+
+  async getPreferenceWeights(mediaType = 'movie') {
+    try {
+      const stored = await AsyncStorage.getItem(`${this.preferenceKeys.PREFERENCE_WEIGHTS}_${mediaType}`);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+      
+      return {
+        genres: {},
+        decades: {},
+        quality: {},
+        lastUpdated: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('Error getting preference weights:', error);
+      return { genres: {}, decades: {}, quality: {}, lastUpdated: new Date().toISOString() };
+    }
+  }
+
+  getQualityTier(voteAverage) {
+    if (voteAverage >= 8.5) return 'exceptional';
+    if (voteAverage >= 7.5) return 'high';
+    if (voteAverage >= 6.5) return 'good';
+    if (voteAverage >= 5.5) return 'average';
+    return 'low';
+  }
+
+  async getPreferenceInsights(mediaType = 'movie') {
+    try {
+      const [weights, notInterested] = await Promise.all([
+        this.getPreferenceWeights(mediaType),
+        this.getNotInterestedList(mediaType)
+      ]);
+
+      return {
+        topLikedGenres: this.getTopPreferences(weights.genres, 5),
+        topAvoidedGenres: this.getBottomPreferences(weights.genres, 3),
+        preferredDecades: this.getTopPreferences(weights.decades, 3),
+        qualityPreference: this.getTopPreferences(weights.quality, 1)[0],
+        totalNotInterested: notInterested.length,
+        commonAvoidanceReasons: this.analyzeAvoidanceReasons(notInterested)
+      };
+    } catch (error) {
+      console.error('Error getting preference insights:', error);
+      return null;
+    }
+  }
+
+  getTopPreferences(preferences, count) {
+    return Object.entries(preferences)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, count)
+      .map(([key, value]) => ({ preference: key, score: value }));
+  }
+
+  getBottomPreferences(preferences, count) {
+    return Object.entries(preferences)
+      .filter(([,score]) => score < 0)
+      .sort(([,a], [,b]) => a - b)
+      .slice(0, count)
+      .map(([key, value]) => ({ preference: key, score: value }));
+  }
+
+  analyzeAvoidanceReasons(notInterestedList) {
+    const reasonCounts = {};
+    notInterestedList.forEach(item => {
+      reasonCounts[item.reason] = (reasonCounts[item.reason] || 0) + 1;
+    });
+    
+    return Object.entries(reasonCounts)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 3)
+      .map(([reason, count]) => ({ reason, count }));
+  }
+
+  async clearAllPreferences() {
+    try {
+      const keys = Object.values(this.preferenceKeys);
+      const allKeys = [];
+      
+      ['movie', 'tv'].forEach(mediaType => {
+        keys.forEach(key => {
+          if (key.includes('user_')) {
+            allKeys.push(`${key}_${mediaType}`);
+          }
+        });
+      });
+      
+      allKeys.push(this.preferenceKeys.DEMOGRAPHIC_PROFILE);
+      
+      await AsyncStorage.multiRemove(allKeys);
+      this.cache.clear();
+      
+      console.log('✅ All user preferences cleared');
+      return true;
+    } catch (error) {
+      console.error('Error clearing preferences:', error);
+      return false;
+    }
+  }
+}
+
+// =============================================================================
+// ENHANCED RECOMMENDATION ENGINE - Integrated into AIRecommendations  
+// =============================================================================
+
+class EnhancedRecommendationEngine {
+  constructor() {
+    this.cache = new Map();
+    this.rateLimitDelay = 1000;
+    this.lastRequestTime = 0;
+  }
+
+  async getPersonalizedRecommendations(userMovies, mediaType = 'movie', options = {}) {
+    try {
+      console.log(`🎯 Getting personalized recommendations for ${mediaType}`);
+      
+      const {
+        count = 20,
+        includePopular = true,
+        includeHidden = true
+      } = options;
+
+      // Step 1: Analyze user preferences
+      const userProfile = await this.buildUserProfile(userMovies, mediaType);
+      
+      // Step 2: Get base recommendations using multiple strategies
+      const baseRecommendations = await this.getBaseRecommendations(
+        userMovies, 
+        userProfile, 
+        mediaType, 
+        count * 3
+      );
+
+      // Step 3: Apply preference-based filtering and scoring
+      const scoredRecommendations = await this.scoreAndFilterRecommendations(
+        baseRecommendations,
+        userProfile,
+        mediaType
+      );
+
+      // Step 4: Apply diversity and quality controls
+      const finalRecommendations = this.optimizeRecommendationList(
+        scoredRecommendations,
+        userProfile,
+        count
+      );
+
+      console.log(`✅ Generated ${finalRecommendations.length} personalized recommendations`);
+      return finalRecommendations;
+
+    } catch (error) {
+      console.error('Error in personalized recommendations:', error);
+      return this.getFallbackRecommendations(userMovies, mediaType);
+    }
+  }
+
+  async buildUserProfile(userMovies, mediaType) {
+    try {
+      const userPreferenceService = new UserPreferenceService();
+      const [preferenceWeights, notInterestedList] = await Promise.all([
+        userPreferenceService.getPreferenceWeights(mediaType),
+        userPreferenceService.getNotInterestedList(mediaType)
+      ]);
+
+      const ratingAnalysis = this.analyzeRatingPatterns(userMovies);
+      
+      const profile = {
+        totalRated: userMovies.length,
+        averageRating: this.calculateAverageRating(userMovies),
+        ratingDistribution: this.analyzeRatingDistribution(userMovies),
+        genrePreferences: this.analyzeGenrePreferences(userMovies, preferenceWeights.genres),
+        decadePreferences: this.analyzeDecadePreferences(userMovies, preferenceWeights.decades),
+        qualityPreferences: this.analyzeQualityPreferences(userMovies, preferenceWeights.quality),
+        ratingPatterns: ratingAnalysis,
+        diversityScore: this.calculateDiversityScore(userMovies),
+        notInterestedItems: notInterestedList,
+        lastUpdated: new Date().toISOString()
+      };
+
+      return profile;
+    } catch (error) {
+      console.error('Error building user profile:', error);
+      return this.getDefaultProfile();
+    }
+  }
+
+  analyzeRatingPatterns(userMovies) {
+    const ratings = userMovies.map(m => m.userRating).filter(r => r != null);
+    
+    return {
+      isGenerousRater: ratings.filter(r => r >= 8).length / ratings.length > 0.4,
+      isCriticalRater: ratings.filter(r => r <= 5).length / ratings.length > 0.3,
+      usesFullScale: (Math.max(...ratings) - Math.min(...ratings)) >= 7,
+      averageDeviation: this.calculateAverageDeviation(userMovies),
+      consistencyScore: this.calculateConsistencyScore(userMovies)
+    };
+  }
+
+  calculateAverageDeviation(userMovies) {
+    const withTMDBRatings = userMovies.filter(m => m.vote_average && m.userRating);
+    if (withTMDBRatings.length === 0) return 0;
+    
+    const deviations = withTMDBRatings.map(m => Math.abs(m.userRating - m.vote_average));
+    return deviations.reduce((sum, dev) => sum + dev, 0) / deviations.length;
+  }
+
+  calculateConsistencyScore(userMovies) {
+    const genreConsistency = {};
+    
+    userMovies.forEach(movie => {
+      if (movie.genre_ids && movie.userRating) {
+        movie.genre_ids.forEach(genreId => {
+          if (!genreConsistency[genreId]) genreConsistency[genreId] = [];
+          genreConsistency[genreId].push(movie.userRating);
+        });
+      }
+    });
+
+    const consistencyScores = Object.values(genreConsistency)
+      .filter(ratings => ratings.length >= 3)
+      .map(ratings => {
+        const mean = ratings.reduce((sum, r) => sum + r, 0) / ratings.length;
+        const variance = ratings.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / ratings.length;
+        return Math.sqrt(variance);
+      });
+
+    return consistencyScores.length > 0 
+      ? consistencyScores.reduce((sum, score) => sum + score, 0) / consistencyScores.length
+      : 0;
+  }
+
+  analyzeGenrePreferences(userMovies, existingWeights) {
+    const genreScores = { ...existingWeights };
+    
+    userMovies.forEach(movie => {
+      if (movie.genre_ids && movie.userRating) {
+        const weight = this.getRatingWeight(movie.userRating);
+        movie.genre_ids.forEach(genreId => {
+          genreScores[genreId] = (genreScores[genreId] || 0) + weight;
+        });
+      }
+    });
+
+    const maxScore = Math.max(...Object.values(genreScores));
+    if (maxScore > 0) {
+      Object.keys(genreScores).forEach(genre => {
+        genreScores[genre] = genreScores[genre] / maxScore;
+      });
+    }
+
+    return genreScores;
+  }
+
+  getRatingWeight(userRating) {
+    if (userRating >= 9) return 3;
+    if (userRating >= 8) return 2;
+    if (userRating >= 7) return 1;
+    if (userRating >= 6) return 0.5;
+    if (userRating >= 4) return -1;
+    return -2;
+  }
+
+  async getBaseRecommendations(userMovies, userProfile, mediaType, count) {
+    // Simplified implementation for consolidation
+    try {
+      const topRated = userMovies
+        .filter(m => m.userRating >= 7)
+        .sort((a, b) => b.userRating - a.userRating)
+        .slice(0, 3);
+
+      const fallbackPromises = topRated.map(async (movie) => {
+        try {
+          const response = await fetch(
+            `https://api.themoviedb.org/3/${mediaType}/${movie.id}/similar?api_key=${TMDB_API_KEY}&page=1`
+          );
+          const data = await response.json();
+          return data.results?.slice(0, Math.ceil(count / topRated.length)) || [];
+        } catch (error) {
+          console.error('Base recommendation error:', error);
+          return [];
+        }
+      });
+
+      const results = await Promise.all(fallbackPromises);
+      const combined = results.flat();
+      
+      return this.removeDuplicates(combined).slice(0, count);
+    } catch (error) {
+      console.error('Error in base recommendations:', error);
+      return [];
+    }
+  }
+
+  async scoreAndFilterRecommendations(recommendations, userProfile, mediaType) {
+    try {
+      const userPreferenceService = new UserPreferenceService();
+      const notInterestedList = await userPreferenceService.getNotInterestedList(mediaType);
+
+      const filteredRecommendations = recommendations.filter(item => {
+        return !notInterestedList.some(notInterested => notInterested.id === item.id);
+      });
+
+      const scoredRecommendations = filteredRecommendations.map(item => ({
+        ...item,
+        personalizedScore: this.calculatePersonalizedScore(item, userProfile),
+        confidenceScore: this.calculateConfidenceScore(item, userProfile),
+        noveltyScore: this.calculateNoveltyScore(item, userProfile)
+      }));
+
+      scoredRecommendations.sort((a, b) => {
+        const scoreA = (a.personalizedScore * 0.6) + (a.confidenceScore * 0.3) + (a.noveltyScore * 0.1);
+        const scoreB = (b.personalizedScore * 0.6) + (b.confidenceScore * 0.3) + (b.noveltyScore * 0.1);
+        return scoreB - scoreA;
+      });
+
+      return scoredRecommendations;
+    } catch (error) {
+      console.error('Error scoring recommendations:', error);
+      return recommendations;
+    }
+  }
+
+  calculatePersonalizedScore(item, userProfile) {
+    let score = 0;
+    let factors = 0;
+
+    if (item.genre_ids && userProfile.genrePreferences) {
+      const genreScore = item.genre_ids.reduce((sum, genreId) => {
+        return sum + (userProfile.genrePreferences[genreId] || 0);
+      }, 0) / item.genre_ids.length;
+      score += genreScore;
+      factors++;
+    }
+
+    if (item.vote_average && userProfile.averageRating) {
+      const qualityAlignment = 1 - Math.abs(item.vote_average - userProfile.averageRating) / 10;
+      score += qualityAlignment;
+      factors++;
+    }
+
+    return factors > 0 ? score / factors : 0;
+  }
+
+  calculateConfidenceScore(item, userProfile) {
+    if (!item.vote_average || !item.vote_count) return 0.5;
+    
+    const qualityScore = item.vote_average / 10;
+    const popularityScore = Math.min(item.vote_count / 1000, 1);
+    const reliabilityScore = item.vote_count > 100 ? 1 : item.vote_count / 100;
+    
+    return (qualityScore * 0.5) + (popularityScore * 0.3) + (reliabilityScore * 0.2);
+  }
+
+  calculateNoveltyScore(item, userProfile) {
+    let noveltyFactors = 0;
+    let noveltySum = 0;
+
+    if (item.genre_ids && userProfile.genrePreferences) {
+      const avgGenreScore = item.genre_ids.reduce((sum, genreId) => {
+        return sum + (userProfile.genrePreferences[genreId] || 0);
+      }, 0) / item.genre_ids.length;
+      
+      noveltySum += (avgGenreScore < 0 ? 1 : 0);
+      noveltyFactors++;
+    }
+
+    return noveltyFactors > 0 ? noveltySum / noveltyFactors : 0.5;
+  }
+
+  optimizeRecommendationList(scoredRecommendations, userProfile, targetCount) {
+    const result = [];
+    const genresUsed = {};
+    
+    for (const item of scoredRecommendations) {
+      if (result.length >= targetCount) break;
+      
+      const itemGenres = item.genre_ids || [];
+      const genreOverlap = itemGenres.filter(genre => genresUsed[genre]).length;
+      const maxGenreRepetition = Math.ceil(targetCount / 10);
+      
+      if (genreOverlap <= maxGenreRepetition) {
+        result.push(item);
+        itemGenres.forEach(genre => {
+          genresUsed[genre] = (genresUsed[genre] || 0) + 1;
+        });
+      }
+    }
+    
+    if (result.length < targetCount) {
+      const remaining = scoredRecommendations
+        .filter(item => !result.includes(item))
+        .slice(0, targetCount - result.length);
+      result.push(...remaining);
+    }
+    
+    return result;
+  }
+
+  removeDuplicates(recommendations) {
+    const seen = new Set();
+    return recommendations.filter(item => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+  }
+
+  getFallbackRecommendations(userMovies, mediaType) {
+    console.log('🔄 Using basic fallback recommendations');
+    return [];
+  }
+
+  getDefaultProfile() {
+    return {
+      totalRated: 0,
+      averageRating: 7,
+      genrePreferences: {},
+      decadePreferences: {},
+      notInterestedItems: [],
+      ratingPatterns: {
+        isGenerousRater: false,
+        isCriticalRater: false,
+        usesFullScale: true
+      }
+    };
+  }
+
+  calculateAverageRating(userMovies) {
+    const ratings = userMovies.map(m => m.userRating).filter(r => r != null);
+    return ratings.length > 0 ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length : 7;
+  }
+
+  analyzeRatingDistribution(userMovies) {
+    const distribution = {};
+    userMovies.forEach(movie => {
+      if (movie.userRating) {
+        const rating = Math.floor(movie.userRating);
+        distribution[rating] = (distribution[rating] || 0) + 1;
+      }
+    });
+    return distribution;
+  }
+
+  analyzeDecadePreferences(userMovies, existingWeights) {
+    const decadeScores = { ...existingWeights };
+    
+    userMovies.forEach(movie => {
+      if ((movie.release_date || movie.first_air_date) && movie.userRating) {
+        const year = parseInt((movie.release_date || movie.first_air_date).substring(0, 4));
+        const decade = Math.floor(year / 10) * 10;
+        const weight = this.getRatingWeight(movie.userRating);
+        decadeScores[decade] = (decadeScores[decade] || 0) + weight;
+      }
+    });
+
+    return decadeScores;
+  }
+
+  analyzeQualityPreferences(userMovies, existingWeights) {
+    const qualityScores = { ...existingWeights };
+    
+    userMovies.forEach(movie => {
+      if (movie.vote_average && movie.userRating) {
+        const qualityTier = this.getQualityTier(movie.vote_average);
+        const weight = this.getRatingWeight(movie.userRating);
+        qualityScores[qualityTier] = (qualityScores[qualityTier] || 0) + weight;
+      }
+    });
+
+    return qualityScores;
+  }
+
+  getQualityTier(voteAverage) {
+    if (voteAverage >= 8.5) return 'exceptional';
+    if (voteAverage >= 7.5) return 'high';
+    if (voteAverage >= 6.5) return 'good';
+    if (voteAverage >= 5.5) return 'average';
+    return 'low';
+  }
+
+  calculateDiversityScore(userMovies) {
+    const genres = new Set();
+    const decades = new Set();
+    
+    userMovies.forEach(movie => {
+      if (movie.genre_ids) movie.genre_ids.forEach(genre => genres.add(genre));
+      if (movie.release_date || movie.first_air_date) {
+        const year = parseInt((movie.release_date || movie.first_air_date).substring(0, 4));
+        decades.add(Math.floor(year / 10) * 10);
+      }
+    });
+
+    return (genres.size + decades.size) / userMovies.length;
+  }
+}
+
+// Create service instances
+const userPreferenceService = new UserPreferenceService();
+const enhancedRecommendationEngine = new EnhancedRecommendationEngine();
 
 class AIRecommendationService {
   constructor() {
@@ -478,6 +1087,121 @@ Recommend 20 ${contentType} this user would rate 8+ based on their specific tast
     this.cache.clear();
     this.userProfileCache.clear();
   }
+
+  // =============================================================================
+  // ENHANCED RECOMMENDATION INTERFACE - NEW SYSTEM
+  // =============================================================================
+
+  async getEnhancedRecommendations(userMovies, mediaType = 'movie', options = {}) {
+    try {
+      console.log(`🚀 Getting enhanced recommendations for ${mediaType} (${userMovies.length} user movies)`);
+      
+      // Use integrated enhanced recommendation engine
+      const enhancedRecommendations = await enhancedRecommendationEngine.getPersonalizedRecommendations(
+        userMovies,
+        mediaType,
+        {
+          count: options.count || 20,
+          includePopular: options.includePopular !== false,
+          includeHidden: options.includeHidden !== false
+        }
+      );
+
+      if (enhancedRecommendations && enhancedRecommendations.length > 0) {
+        console.log(`✅ Enhanced system returned ${enhancedRecommendations.length} recommendations`);
+        return enhancedRecommendations;
+      }
+
+      // Fallback to original system if enhanced fails
+      console.log('🔄 Enhanced system failed, falling back to original');
+      return await this.getGroqRecommendations(userMovies, mediaType);
+      
+    } catch (error) {
+      console.error('❌ Enhanced recommendations failed:', error);
+      
+      // Double fallback to original system
+      try {
+        return await this.getGroqRecommendations(userMovies, mediaType);
+      } catch (fallbackError) {
+        console.error('❌ Fallback recommendations also failed:', fallbackError);
+        return this.getFallbackRecommendations(userMovies, mediaType);
+      }
+    }
+  }
+
+  async recordNotInterested(item, reason = 'not_interested', mediaType = 'movie') {
+    try {
+      const success = await userPreferenceService.addNotInterestedItem(item, reason, mediaType);
+      
+      if (success) {
+        console.log(`📝 Recorded not interested: ${item.title || item.name} (${reason})`);
+        
+        // Clear recommendation cache to get fresh results
+        this.cache.clear();
+        this.userProfileCache.clear();
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error recording not interested:', error);
+      return false;
+    }
+  }
+
+  async recordUserRating(item, userRating, mediaType = 'movie') {
+    try {
+      // Update preference weights based on rating
+      const weight = this.calculatePreferenceWeight(userRating);
+      await userPreferenceService.updatePreferenceWeights(item, weight, mediaType);
+      
+      console.log(`📊 Updated preferences based on rating: ${item.title || item.name} (${userRating}/10)`);
+      
+      // Clear caches for fresh recommendations
+      this.cache.clear();
+      this.userProfileCache.clear();
+      
+      return true;
+    } catch (error) {
+      console.error('Error recording user rating:', error);
+      return false;
+    }
+  }
+
+  calculatePreferenceWeight(userRating) {
+    // Convert user rating to preference weight
+    if (userRating >= 9) return 3;      // Loved
+    if (userRating >= 8) return 2;      // Really liked
+    if (userRating >= 7) return 1;      // Liked
+    if (userRating >= 6) return 0.5;    // Neutral positive
+    if (userRating >= 4) return -1;     // Disliked
+    return -2;                          // Strongly disliked
+  }
+
+  async getUserPreferenceInsights(mediaType = 'movie') {
+    try {
+      return await userPreferenceService.getPreferenceInsights(mediaType);
+    } catch (error) {
+      console.error('Error getting preference insights:', error);
+      return null;
+    }
+  }
+
+  async clearUserPreferences() {
+    try {
+      const success = await userPreferenceService.clearAllPreferences();
+      if (success) {
+        this.cache.clear();
+        this.userProfileCache.clear();
+        console.log('✅ All user preferences cleared');
+      }
+      return success;
+    } catch (error) {
+      console.error('Error clearing preferences:', error);
+      return false;
+    }
+  }
 }
 
 // Export singleton instance
@@ -502,5 +1226,16 @@ export const getAIRecommendations = async (userMovies, mediaType, seenList, unse
     return [];
   }
 };
+
+// =============================================================================
+// ENHANCED EXPORT INTERFACE
+// =============================================================================
+
+// Export both original function for compatibility and enhanced system
+export const getEnhancedRecommendations = aiRecommendationService.getEnhancedRecommendations.bind(aiRecommendationService);
+export const recordNotInterested = aiRecommendationService.recordNotInterested.bind(aiRecommendationService);
+export const recordUserRating = aiRecommendationService.recordUserRating.bind(aiRecommendationService);
+export const getUserPreferenceInsights = aiRecommendationService.getUserPreferenceInsights.bind(aiRecommendationService);
+export const clearUserPreferences = aiRecommendationService.clearUserPreferences.bind(aiRecommendationService);
 
 export default aiRecommendationService;

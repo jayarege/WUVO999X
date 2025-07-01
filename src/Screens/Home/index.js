@@ -33,7 +33,7 @@ import { getRatingStyles } from '../../Styles/ratingStyles';
 import { getLayoutStyles } from '../../Styles/layoutStyles';
 import theme from '../../utils/Theme';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getAIRecommendations } from '../../utils/AIRecommendations';
+import { getAIRecommendations, getEnhancedRecommendations, recordNotInterested, recordUserRating } from '../../utils/AIRecommendations';
 import { RatingModal } from '../../Components/RatingModal';
 import { ActivityIndicator } from 'react-native';
 import { TMDB_API_KEY as API_KEY } from '../../Constants';
@@ -295,6 +295,49 @@ function HomeScreen({
   }, [selectedMovie, mediaType, sendNegativeFeedbackToAI, addToSkippedMovies, storePermanentlyNotInterested, unseen, onRemoveFromWatchlist]);
 
   // ============================================================================
+  // **ENHANCED NOT INTERESTED HANDLER - ISSUE #8**
+  // ============================================================================
+  
+  const handleEnhancedNotInterested = useCallback(async (item, reason = 'not_interested') => {
+    try {
+      console.log(`❌ Enhanced not interested: ${item.title || item.name} (${reason})`);
+      
+      // Record in enhanced preference system
+      const success = await recordNotInterested(item, reason, mediaType);
+      
+      if (success) {
+        // Remove from current AI recommendations immediately
+        setAiRecommendations(prev => {
+          const filtered = prev.filter(movie => movie.id !== item.id);
+          console.log(`🗑️ Removed from AI recommendations: ${prev.length} -> ${filtered.length}`);
+          return filtered;
+        });
+        
+        // Also add to legacy skipped movies for backward compatibility
+        if (addToSkippedMovies) {
+          addToSkippedMovies(item.id);
+        }
+        
+        // Show success feedback
+        Alert.alert(
+          '✅ Not Interested',
+          `We won't recommend "${item.title || item.name}" again.`,
+          [{ text: 'OK' }],
+          { duration: 2000 }
+        );
+        
+        console.log(`✅ Successfully recorded not interested for: ${item.title || item.name}`);
+      } else {
+        console.error('Failed to record not interested preference');
+      }
+      
+    } catch (error) {
+      console.error('Error handling enhanced not interested:', error);
+      Alert.alert('Error', 'Failed to record preference. Please try again.');
+    }
+  }, [mediaType, recordNotInterested, addToSkippedMovies]);
+
+  // ============================================================================
   // **UTILITY FUNCTIONS - ENGINEER TEAM 10**
   // ============================================================================
 
@@ -416,12 +459,17 @@ function HomeScreen({
       }
 
       const currentMediaType = contentType === 'movies' ? 'movie' : 'tv';
-      const recommendations = await getAIRecommendations(
+      
+      // Use enhanced recommendation system with user preferences
+      console.log(`🎯 Fetching enhanced recommendations for ${currentMediaType}`);
+      const recommendations = await getEnhancedRecommendations(
         topRatedContent, 
         currentMediaType,
-        seen,
-        unseen,
-        [...skippedMovies, ...notInterestedMovies]
+        {
+          count: 20,
+          includePopular: true,
+          includeHidden: true
+        }
       );
       
       setAiRecommendations(recommendations);
@@ -792,6 +840,11 @@ function HomeScreen({
     
     onAddToSeen(ratedMovie);
     
+    // **Enhanced Preference Learning - Issue #8**
+    recordUserRating(ratedMovie, finalRating, mediaType).catch(error => {
+      console.error('Failed to record rating for preference learning:', error);
+    });
+    
     // Refresh home screen data
     fetchRecentReleases();
     fetchPopularMovies();
@@ -977,6 +1030,11 @@ function HomeScreen({
     };
     
     onAddToSeen(ratedMovie);
+    
+    // **Enhanced Preference Learning - Issue #8**
+    recordUserRating(ratedMovie, rating, mediaType).catch(error => {
+      console.error('Failed to record rating for preference learning:', error);
+    });
     
     if (recentReleases.some(m => m.id === selectedMovie.id)) {
       setRecentReleases(prev => 
@@ -1458,6 +1516,18 @@ function HomeScreen({
                     <View style={[styles.aiRecommendationBadge, { backgroundColor: '#4CAF50', top: 12 }]}>
                       <Text style={styles.rankingNumber}>AI</Text>
                     </View>
+                    
+                    {/* Enhanced Not Interested Button */}
+                    <TouchableOpacity
+                      style={styles.notInterestedButton}
+                      onPress={(e) => {
+                        e.stopPropagation(); // Prevent card tap
+                        handleEnhancedNotInterested(item);
+                      }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Ionicons name="close-circle" size={28} color="#ff4444" />
+                    </TouchableOpacity>
                     <Image
                       source={{
                         uri: `https://image.tmdb.org/t/p/w500${item.poster_path}`
@@ -2500,6 +2570,22 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 8,
+  },
+  
+  // **Enhanced Not Interested Button - Issue #8**
+  notInterestedButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 14,
+    padding: 2,
+    zIndex: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
 });
 

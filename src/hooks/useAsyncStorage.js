@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 import { STORAGE_KEYS } from '../config';
@@ -92,6 +92,11 @@ export const useAsyncStorage = () => {
       await AsyncStorage.clear();
     }
   }, []);
+
+  // Initialize preferences on mount
+  useEffect(() => {
+    loadPreferences();
+  }, [loadPreferences]);
 
   return {
     isDarkMode,

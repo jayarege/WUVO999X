@@ -11,6 +11,7 @@ import AuthScreen from './src/Screens/AuthScreen';
 import OnboardingScreen from './src/Screens/OnboardingScreen';
 import TabNavigator from './src/Navigation/TabNavigator';
 import MovieDetailScreen from './src/Screens/MovieDetailScreen';
+import SettingsScreen from './src/Screens/SettingsScreen';
 
 // Import development configuration
 import { isDevModeEnabled, getDevMovies, getDevTVShows, getDevUser } from './src/utils/DevConfig';
@@ -219,6 +220,14 @@ export default function App() {
                 component={MovieDetailScreen}
                 options={({ route }) => ({ title: route.params.movieTitle })}
               />
+              <Stack.Screen name="Settings">
+                {props => (
+                  <SettingsScreen
+                    {...props}
+                    isDarkMode={isDarkMode}
+                  />
+                )}
+              </Stack.Screen>
             </>
           )}
         </Stack.Navigator>

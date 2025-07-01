@@ -71,17 +71,11 @@ const getRatingStyles = (mediaType = 'movie', mode = 'light', theme) => {
       justifyContent: 'space-between',
       padding: 20,
       paddingTop: 15,
-      paddingBottom: 15,
+      paddingBottom: 20,
       borderTopWidth: 1,
       borderTopColor: 'rgba(255,255,255,0.1)',
       backgroundColor: 'transparent',
       marginTop: 'auto',
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      borderBottomLeftRadius: 20,
-      borderBottomRightRadius: 20,
     },
 
     // LEGACY COMPACT RATING STYLES (for backwards compatibility)

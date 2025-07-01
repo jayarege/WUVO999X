@@ -22,7 +22,7 @@ import { useAuth } from '../../hooks/useAuth';
 const { width } = Dimensions.get('window');
 const POSTER_SIZE = (width - 60) / 3; // 3 columns with spacing
 
-const ProfileScreen = ({ seen = [], unseen = [], isDarkMode }) => {
+const ProfileScreen = ({ navigation, seen = [], unseen = [], isDarkMode }) => {
   const { mediaType } = useMediaType();
   const { handleLogout } = useAuth();
   const [selectedTab, setSelectedTab] = useState('posts');
@@ -80,15 +80,28 @@ const ProfileScreen = ({ seen = [], unseen = [], isDarkMode }) => {
   const handleDropdownSelect = async (option) => {
     setShowDropdown(false);
     if (option === 'settings') {
-      // Handle settings navigation
-      console.log('Navigate to Settings');
+      navigation.navigate('Settings');
     } else if (option === 'logout') {
-      try {
-        await handleLogout();
-      } catch (error) {
-        console.error('Logout error:', error);
-        Alert.alert('Error', 'Failed to logout. Please try again.');
-      }
+      Alert.alert(
+        'Confirm Logout',
+        'Are you sure you want to logout? This will clear all your data.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Logout',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await handleLogout();
+                // Navigation will be handled automatically by App.js auth state change
+              } catch (error) {
+                console.error('Logout error:', error);
+                Alert.alert('Error', 'Failed to logout. Please try again.');
+              }
+            }
+          }
+        ]
+      );
     }
   };
 
